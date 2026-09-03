@@ -1,0 +1,58 @@
+# Lima config for Proteus, a Credential-Isolated Dev VM.
+# Start with: limactl start --name=proteus ./vm/proteus.yaml
+
+vmType: "vz"
+arch: "aarch64"
+
+images:
+  - location: "https://cloud-images.ubuntu.com/releases/resolute/release/ubuntu-26.04-server-cloudimg-arm64.img"
+    arch: "aarch64"
+    variant: "server"
+
+cpus: 2
+memory: "4GiB"
+disk: "40GiB"
+
+user:
+  home: "/home/{{.User}}"
+  shell: "/bin/bash"
+  passwordlessSudo: true
+
+# Repos and credentials live on the VM disk. Do not mount the macOS home dir.
+mounts: []
+
+ssh:
+  loadDotSSHPubKeys: false
+  forwardAgent: false
+
+# Docker Engine is installed by vm/bootstrap.sh. Lima's containerd is not needed.
+containerd:
+  system: false
+  user: false
+
+portForwards:
+  - guestPort: 3000
+    hostPort: 3000
+    hostIP: "127.0.0.1"
+  - guestPort: 5173
+    hostPort: 5173
+    hostIP: "127.0.0.1"
+  - guestPort: 8000
+    hostPort: 8000
+    hostIP: "127.0.0.1"
+  - guestPort: 8080
+    hostPort: 8080
+    hostIP: "127.0.0.1"
+
+# Ubuntu 26.04 cloud images can otherwise wait on a renamed network interface.
+param:
+  internal_netplanOptional: "true"
+
+message: |
+  proteus is running.
+
+  Bootstrap tools:
+    limactl shell proteus < ./vm/bootstrap.sh
+
+  Enter the VM:
+    limactl shell proteus
