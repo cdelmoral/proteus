@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly repository_root="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+repository_root="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
+readonly repository_root
 readonly test_playbook="${repository_root}/tests/preferences_test.yml"
 test_count=0
 

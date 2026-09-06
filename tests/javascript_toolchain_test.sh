@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly repository_root="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+repository_root="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
+readonly repository_root
 readonly variables="${repository_root}/provisioning/group_vars/all.yml"
 readonly tasks="${repository_root}/provisioning/tasks/javascript.yml"
 readonly smoke_tasks="${repository_root}/provisioning/tasks/javascript_smoke.yml"
@@ -41,6 +42,8 @@ assert_contains "$tasks" 'configured_pnpm_project_version_policy.stdout | trim !
 assert_contains "$smoke_tasks" 'pnpm_project_version_policy.stdout | trim == "download"'
 assert_contains "$smoke_tasks" 'smoke_managed_node.stdout | trim'
 assert_contains "$shell_tasks" '# {mark} ANSIBLE MANAGED BLOCK: Proteus JavaScript toolchain'
+# The assertion checks a literal shell block embedded in Ansible.
+# shellcheck disable=SC2016
 assert_contains "$shell_tasks" 'export PNPM_HOME="$HOME/.local/share/proteus/pnpm/{{ pnpm_version }}"'
 assert_contains "$playbook" '        - development_tools'
 assert_contains "$playbook" '        - shell'

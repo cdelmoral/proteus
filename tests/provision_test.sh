@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly repository_root="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+repository_root="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
+readonly repository_root
 readonly provision_command="${repository_root}/provision"
 test_count=0
 
@@ -359,7 +360,10 @@ test_complete_ansible_cutover() {
   assert_contains "$(<"$vm_definition")" './provision'
   assert_contains "$operator_docs" 'fresh VMs'
   assert_contains "$operator_docs" 'local-preferences.yml'
+  # Backticks are literal documentation content in these assertions.
+  # shellcheck disable=SC2016
   assert_contains "$operator_docs" '`system`'
+  # shellcheck disable=SC2016
   assert_contains "$operator_docs" '`smoke`'
   assert_contains "$operator_docs" 'unmanaged packages, files, and shell content'
 

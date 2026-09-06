@@ -2,7 +2,8 @@
 set -euo pipefail
 
 readonly instance="${PROTEUS_INSTANCE:-proteus}"
-readonly script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+readonly script_dir
 readonly playbook="${script_dir}/provisioning/playbook.yml"
 readonly local_preferences_file="${script_dir}/provisioning/local-preferences.yml"
 
