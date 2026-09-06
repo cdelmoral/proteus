@@ -1,4 +1,6 @@
 ---
+proteus_upgrade: false
+
 baseline_system_packages:
   - build-essential
   - ca-certificates

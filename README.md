@@ -30,6 +30,22 @@ Install the development tools:
 limactl shell proteus < ./vm/bootstrap.sh
 ```
 
+## Provisioning modes
+
+Routine Ansible Provisioning reconciles the checked-in package and tool versions without requesting an Ubuntu package upgrade:
+
+```bash
+./provision
+```
+
+Request safe Ubuntu package upgrades explicitly:
+
+```bash
+./provision --upgrade
+```
+
+Upgrade mode does not discover new mise, Node, or pnpm releases. Change their checked-in versions before Provisioning can install a newer release.
+
 Enter the VM:
 
 ```bash
