@@ -6,6 +6,11 @@ readonly script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 readonly playbook="${script_dir}/provisioning/playbook.yml"
 readonly local_preferences_file="${script_dir}/provisioning/local-preferences.yml"
 
+usage() {
+  printf 'Usage: %s [--upgrade]\n' "${0##*/}" >&2
+  printf 'Safe Ubuntu package upgrades are opt-in; managed tool versions remain pinned.\n' >&2
+}
+
 json_escape() {
   local value="$1"
   value="${value//\\/\\\\}"
@@ -16,10 +21,22 @@ json_escape() {
   printf '%s' "$value"
 }
 
-if (( $# != 0 )); then
-  printf 'Usage: %s\n' "${0##*/}" >&2
-  exit 2
-fi
+case "$#" in
+  0)
+    readonly proteus_upgrade=false
+    ;;
+  1)
+    if [[ "$1" != "--upgrade" ]]; then
+      usage
+      exit 2
+    fi
+    readonly proteus_upgrade=true
+    ;;
+  *)
+    usage
+    exit 2
+    ;;
+esac
 
 if ! command -v ansible-playbook >/dev/null 2>&1; then
   printf 'ansible-playbook is required. Install it with: brew install ansible\n' >&2
@@ -58,6 +75,8 @@ ansible_arguments=(
   --inventory
   "${hostname},"
   "--ssh-common-args=-F ${ssh_config}"
+  --extra-vars
+  "{\"proteus_upgrade\":${proteus_upgrade}}"
 )
 if [[ -f "$local_preferences_file" ]]; then
   ansible_arguments+=(

@@ -136,8 +136,22 @@ test_ansible_invocation() {
   assert_file_contains_line "$arguments_file" '--inventory'
   assert_file_contains_line "$arguments_file" 'lima-ticket-2,'
   assert_file_contains_line "$arguments_file" "--ssh-common-args=-F ${SSH_CONFIG}"
+  assert_file_contains_line "$arguments_file" '{"proteus_upgrade":false}'
   assert_file_contains_line "$arguments_file" "${repository_root}/provisioning/playbook.yml"
   assert_file_excludes "$arguments_file" 'local_preferences_file'
+}
+
+test_upgrade_invocation() {
+  local arguments_file="${TEST_DIRECTORY}/ansible-arguments"
+  stub_command limactl "printf '%s\\n' 'Running|lima-proteus|${SSH_CONFIG}'"
+  stub_command ansible-playbook \
+    "printf '%s\\n' \"\$@\" >'${arguments_file}'"
+
+  PATH="${BIN_DIRECTORY}:/usr/bin:/bin" "$provision_command" --upgrade
+
+  assert_file_contains_line "$arguments_file" '--extra-vars'
+  assert_file_contains_line "$arguments_file" '{"proteus_upgrade":true}'
+  assert_file_contains_line "$arguments_file" "${repository_root}/provisioning/playbook.yml"
 }
 
 test_local_preferences_invocation() {
@@ -164,10 +178,13 @@ test_ansible_exit_status() {
   stub_command limactl "printf '%s\\n' 'Running|lima-proteus|${SSH_CONFIG}'"
   stub_command ansible-playbook 'exit 42'
 
-  local status=0
-  PATH="${BIN_DIRECTORY}:/usr/bin:/bin" "$provision_command" >/dev/null 2>&1 || status=$?
+  local normal_status=0
+  local upgrade_status=0
+  PATH="${BIN_DIRECTORY}:/usr/bin:/bin" "$provision_command" >/dev/null 2>&1 || normal_status=$?
+  PATH="${BIN_DIRECTORY}:/usr/bin:/bin" "$provision_command" --upgrade >/dev/null 2>&1 || upgrade_status=$?
 
-  [[ $status -eq 42 ]] || fail "Ansible exit status became $status"
+  [[ $normal_status -eq 42 ]] || fail "Ansible exit status became $normal_status in normal mode"
+  [[ $upgrade_status -eq 42 ]] || fail "Ansible exit status became $upgrade_status in upgrade mode"
 }
 
 test_rejects_arguments() {
@@ -179,7 +196,36 @@ test_rejects_arguments() {
   output="$(PATH="${BIN_DIRECTORY}:/usr/bin:/bin" "$provision_command" --extra-vars danger=true 2>&1)" || status=$?
 
   [[ $status -eq 2 ]] || fail "invalid arguments returned $status"
-  assert_contains "$output" 'Usage: provision'
+  assert_contains "$output" 'Usage: provision [--upgrade]'
+
+  status=0
+  output="$(PATH="${BIN_DIRECTORY}:/usr/bin:/bin" "$provision_command" --upgrade --upgrade 2>&1)" || status=$?
+
+  [[ $status -eq 2 ]] || fail "duplicate upgrade arguments returned $status"
+  assert_contains "$output" 'Usage: provision [--upgrade]'
+}
+
+test_upgrade_policy() {
+  local command_contents
+  local system_tasks
+  local variables
+  command_contents="$(<"$provision_command")"
+  system_tasks="$(<"${repository_root}/provisioning/tasks/system.yml")"
+  variables="$(<"${repository_root}/provisioning/group_vars/all.yml")"
+
+  assert_contains "$command_contents" 'Safe Ubuntu package upgrades are opt-in; managed tool versions remain pinned.'
+  assert_contains "$variables" 'proteus_upgrade: false'
+  assert_contains "$system_tasks" 'upgrade: safe'
+  assert_contains "$system_tasks" 'autoremove: false'
+  assert_contains "$system_tasks" 'purge: false'
+  assert_contains "$system_tasks" 'fail_on_autoremove: true'
+  assert_contains "$system_tasks" 'force_apt_get: true'
+  assert_contains "$system_tasks" 'dpkg_options: force-confdef,force-confold'
+  assert_contains "$system_tasks" 'when: proteus_upgrade | bool'
+  assert_not_contains "$system_tasks" 'state: latest'
+  assert_not_contains "$command_contents$system_tasks" 'mise upgrade'
+  assert_not_contains "$command_contents$system_tasks" 'node@lts'
+  assert_not_contains "$command_contents$system_tasks" 'pnpm@latest'
 }
 
 test_pinned_image() {
@@ -296,9 +342,11 @@ run_test 'reports a missing Lima instance' test_missing_instance
 run_test 'reports a stopped Lima instance' test_stopped_instance
 run_test 'reports an unreadable SSH configuration' test_unreadable_ssh_config
 run_test 'uses Lima connection data for Ansible' test_ansible_invocation
+run_test 'enables deliberate upgrades through the wrapper' test_upgrade_invocation
 run_test 'passes an existing local preferences file to Ansible' test_local_preferences_invocation
 run_test 'preserves the Ansible exit status' test_ansible_exit_status
 run_test 'rejects unsupported arguments' test_rejects_arguments
+run_test 'keeps upgrades safe and tools pinned' test_upgrade_policy
 run_test 'pins the Ubuntu image and digest' test_pinned_image
 run_test 'keeps the existing baseline package set' test_baseline_package_list
 run_test 'documents and ignores local preferences' test_local_preferences_files
