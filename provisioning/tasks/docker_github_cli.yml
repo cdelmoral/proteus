@@ -1,0 +1,119 @@
+---
+- name: Create the apt keyring directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+  tags:
+    - docker
+    - github_cli
+
+- name: Download the Docker repository key
+  ansible.builtin.get_url:
+    url: "{{ docker_repository_key_url }}"
+    dest: "{{ docker_repository_key_path }}"
+    checksum: "{{ docker_repository_key_checksum }}"
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  tags:
+    - docker
+
+- name: Configure the Docker apt repository
+  ansible.builtin.copy:
+    dest: "{{ docker_repository_source_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      Types: deb
+      URIs: {{ docker_repository_uri }}
+      Suites: {{ docker_repository_suite }}
+      Components: {{ docker_repository_component }}
+      Architectures: {{ docker_repository_architecture }}
+      Signed-By: {{ docker_repository_key_path }}
+  become: true
+  tags:
+    - docker
+
+- name: Download the GitHub CLI repository key
+  ansible.builtin.get_url:
+    url: "{{ github_cli_repository_key_url }}"
+    dest: "{{ github_cli_repository_key_path }}"
+    checksum: "{{ github_cli_repository_key_checksum }}"
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  tags:
+    - github_cli
+
+- name: Configure the GitHub CLI apt repository
+  ansible.builtin.copy:
+    dest: "{{ github_cli_repository_source_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      Types: deb
+      URIs: {{ github_cli_repository_uri }}
+      Suites: {{ github_cli_repository_suite }}
+      Components: {{ github_cli_repository_component }}
+      Architectures: {{ github_cli_repository_architecture }}
+      Signed-By: {{ github_cli_repository_key_path }}
+  become: true
+  tags:
+    - github_cli
+
+- name: Refresh apt metadata for third-party repositories
+  ansible.builtin.apt:
+    update_cache: true
+  become: true
+  changed_when: false
+  tags:
+    - docker
+    - github_cli
+
+- name: Install Docker Engine and command-line tools
+  ansible.builtin.apt:
+    name: "{{ docker_packages }}"
+    state: present
+  become: true
+  tags:
+    - docker
+
+- name: Enable and start Docker
+  ansible.builtin.service:
+    name: docker
+    enabled: true
+    state: started
+  become: true
+  tags:
+    - docker
+
+- name: Add the Lima user to the Docker group
+  ansible.builtin.user:
+    name: "{{ ansible_user_id }}"
+    groups:
+      - docker
+    append: true
+  become: true
+  tags:
+    - docker
+
+- name: Reset the connection for Docker group membership
+  ansible.builtin.meta: reset_connection
+  tags:
+    - docker
+
+- name: Install GitHub CLI
+  ansible.builtin.apt:
+    name: "{{ github_cli_packages }}"
+    state: present
+  become: true
+  tags:
+    - github_cli
