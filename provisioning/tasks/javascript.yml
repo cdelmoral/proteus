@@ -1,0 +1,153 @@
+---
+- name: Create directories for managed development tools
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ ansible_user_dir }}/.cache/proteus"
+    - "{{ ansible_user_dir }}/.config/mise"
+    - "{{ ansible_user_dir }}/.local/bin"
+    - "{{ mise_install_dir }}"
+    - "{{ pnpm_install_dir | dirname }}"
+
+- name: Download the pinned mise binary
+  ansible.builtin.get_url:
+    url: "{{ mise_download_url }}"
+    dest: "{{ mise_binary }}"
+    checksum: "{{ mise_checksum }}"
+    mode: "0755"
+
+- name: Link mise into the user binary directory
+  ansible.builtin.file:
+    src: "{{ mise_binary }}"
+    dest: "{{ ansible_user_dir }}/.local/bin/mise"
+    state: link
+    force: true
+
+- name: Read the globally selected Node version
+  ansible.builtin.command:
+    argv:
+      - "{{ mise_binary }}"
+      - config
+      - get
+      - --global
+      - tools.node
+  register: selected_node_version
+  changed_when: false
+  failed_when: false
+
+- name: Find the exact Node installation
+  ansible.builtin.command:
+    argv:
+      - "{{ mise_binary }}"
+      - where
+      - "node@{{ node_version }}"
+  register: installed_node
+  changed_when: false
+  failed_when: false
+
+- name: Install and globally select the exact Node version
+  ansible.builtin.command:
+    argv:
+      - "{{ mise_binary }}"
+      - use
+      - --global
+      - --pin
+      - "node@{{ node_version }}"
+  environment:
+    MISE_NODE_VERIFY: "true"
+    MISE_YES: "1"
+  when: >-
+    selected_node_version.rc != 0
+    or selected_node_version.stdout | trim != node_version
+    or installed_node.rc != 0
+  changed_when: true
+
+- name: Find the managed Node installation
+  ansible.builtin.command:
+    argv:
+      - "{{ mise_binary }}"
+      - where
+      - "node@{{ node_version }}"
+  register: managed_node
+  changed_when: false
+
+- name: Remove Corepack bundled with Node
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ managed_node.stdout | trim }}/bin/corepack"
+    - "{{ managed_node.stdout | trim }}/lib/node_modules/corepack"
+    - "{{ ansible_user_dir }}/.local/share/mise/shims/corepack"
+
+- name: Download the pinned pnpm archive
+  ansible.builtin.get_url:
+    url: "{{ pnpm_download_url }}"
+    dest: "{{ pnpm_archive }}"
+    checksum: "{{ pnpm_checksum }}"
+    mode: "0644"
+
+- name: Inspect the pnpm executable
+  ansible.builtin.stat:
+    path: "{{ pnpm_install_dir }}/pnpm"
+  register: pnpm_executable
+
+- name: Inspect the pnpm runtime files
+  ansible.builtin.stat:
+    path: "{{ pnpm_install_dir }}/dist"
+  register: pnpm_runtime
+
+- name: Remove an incomplete pnpm installation
+  ansible.builtin.file:
+    path: "{{ pnpm_install_dir }}"
+    state: absent
+  when: >-
+    not (pnpm_executable.stat.isreg | default(false))
+    or not (pnpm_executable.stat.executable | default(false))
+    or not (pnpm_runtime.stat.isdir | default(false))
+
+- name: Create the pinned pnpm installation directory
+  ansible.builtin.file:
+    path: "{{ pnpm_install_dir }}"
+    state: directory
+    mode: "0755"
+  when: >-
+    not (pnpm_executable.stat.isreg | default(false))
+    or not (pnpm_executable.stat.executable | default(false))
+    or not (pnpm_runtime.stat.isdir | default(false))
+
+- name: Install the pinned pnpm archive
+  ansible.builtin.unarchive:
+    src: "{{ pnpm_archive }}"
+    dest: "{{ pnpm_install_dir }}"
+    remote_src: true
+    mode: "u+rwX,go+rX"
+  when: >-
+    not (pnpm_executable.stat.isreg | default(false))
+    or not (pnpm_executable.stat.executable | default(false))
+    or not (pnpm_runtime.stat.isdir | default(false))
+
+- name: Read pnpm project-version handling policy
+  ansible.builtin.command:
+    argv:
+      - "{{ pnpm_install_dir }}/pnpm"
+      - config
+      - get
+      - --global
+      - pmOnFail
+  register: configured_pnpm_project_version_policy
+  changed_when: false
+
+- name: Enable pnpm project-version downloads
+  ansible.builtin.command:
+    argv:
+      - "{{ pnpm_install_dir }}/pnpm"
+      - config
+      - set
+      - --global
+      - pmOnFail
+      - download
+  when: configured_pnpm_project_version_policy.stdout | trim != "download"
+  changed_when: true

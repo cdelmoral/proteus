@@ -1,0 +1,124 @@
+---
+- name: Read the installed mise version
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_user_dir }}/.local/bin/mise"
+      - --version
+  register: mise_version_check
+  changed_when: false
+
+- name: Read the installed Node version through mise
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_user_dir }}/.local/bin/mise"
+      - exec
+      - "node@{{ node_version }}"
+      - --
+      - node
+      - --version
+  register: node_version_check
+  changed_when: false
+
+- name: Read the installed pnpm version
+  ansible.builtin.command:
+    argv:
+      - "{{ pnpm_install_dir }}/pnpm"
+      - --version
+  register: pnpm_version_check
+  changed_when: false
+
+- name: Read pnpm project-version handling policy
+  ansible.builtin.command:
+    argv:
+      - "{{ pnpm_install_dir }}/pnpm"
+      - config
+      - get
+      - --global
+      - pmOnFail
+  register: pnpm_project_version_policy
+  changed_when: false
+
+- name: Find the managed Node installation for smoke checks
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_user_dir }}/.local/bin/mise"
+      - where
+      - "node@{{ node_version }}"
+  register: smoke_managed_node
+  changed_when: false
+
+- name: Verify exact JavaScript tool versions
+  ansible.builtin.assert:
+    that:
+      - mise_version_check.stdout.split()[0] == mise_version
+      - node_version_check.stdout | trim == "v" ~ node_version
+      - pnpm_version_check.stdout | trim == pnpm_version
+      - pnpm_project_version_policy.stdout | trim == "download"
+    fail_msg: >-
+      Expected mise {{ mise_version }}, Node {{ node_version }}, and pnpm
+      {{ pnpm_version }} with project-aware selection. Found
+      {{ mise_version_check.stdout | trim }},
+      {{ node_version_check.stdout | trim }}, and
+      {{ pnpm_version_check.stdout | trim }}.
+
+- name: Check that Corepack is unavailable through managed Node
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_user_dir }}/.local/bin/mise"
+      - exec
+      - "node@{{ node_version }}"
+      - --
+      - /usr/bin/env
+      - sh
+      - -c
+      - 'command -v corepack'
+  register: corepack_command_check
+  changed_when: false
+  failed_when: false
+
+- name: Inspect Corepack paths bundled with Node
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ smoke_managed_node.stdout | trim }}/bin/corepack"
+    - "{{ smoke_managed_node.stdout | trim }}/lib/node_modules/corepack"
+  register: corepack_path_checks
+
+- name: Verify Corepack is absent
+  ansible.builtin.assert:
+    that:
+      - corepack_command_check.rc != 0
+      - >-
+        corepack_path_checks.results
+        | map(attribute='stat.exists')
+        | select
+        | list
+        | length == 0
+    fail_msg: Corepack must not be available in the managed Node environment.
+
+- name: Check ownership of managed JavaScript tool files
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/find
+      - "{{ mise_install_dir }}"
+      - "{{ smoke_managed_node.stdout | trim }}"
+      - "{{ pnpm_install_dir }}"
+      - "{{ pnpm_archive }}"
+      - "{{ ansible_user_dir }}/.local/bin/mise"
+      - "{{ ansible_user_dir }}/.config/mise/config.toml"
+      - "{{ ansible_user_dir }}/.config/pnpm/config.yaml"
+      - "!"
+      - -user
+      - "{{ ansible_user_id }}"
+      - -print
+      - -quit
+  register: javascript_ownership_check
+  changed_when: false
+
+- name: Verify ownership of managed JavaScript tool files
+  ansible.builtin.assert:
+    that:
+      - javascript_ownership_check.stdout | trim | length == 0
+    fail_msg: >-
+      Managed JavaScript tool files must belong to {{ ansible_user_id }}:
+      {{ javascript_ownership_check.stdout | trim }}
