@@ -29,7 +29,7 @@ ssh:
   loadDotSSHPubKeys: false
   forwardAgent: false
 
-# Docker Engine is installed by vm/bootstrap.sh.
+# Docker Engine is installed by Ansible Provisioning.
 # Lima's containerd is not needed.
 containerd:
   system: false
@@ -56,8 +56,10 @@ param:
 message: |
   proteus is running.
 
-  Bootstrap tools:
-    limactl shell proteus < ./vm/bootstrap.sh
+  Run Provisioning from the Proteus repository on macOS:
+    ./provision
 
   Enter the VM:
     limactl shell proteus
+
+  Perform Credential Enrollment inside the VM. See vm/README.md.

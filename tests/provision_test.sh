@@ -308,11 +308,12 @@ test_docker_and_github_cli_package_lists() {
 
 test_docker_and_github_cli_playbook_wiring() {
   local playbook="${repository_root}/provisioning/playbook.yml"
+  local smoke_tasks="${repository_root}/provisioning/tasks/smoke.yml"
   local contents
-  contents="$(<"$playbook")"
+  contents="$(<"$playbook")$(<"$smoke_tasks")"
 
   assert_contains "$contents" 'ansible.builtin.import_tasks: tasks/docker_github_cli.yml'
-  assert_contains "$contents" 'ansible.builtin.import_tasks: tasks/docker_github_cli_smoke.yml'
+  assert_contains "$contents" 'ansible.builtin.import_tasks: docker_github_cli_smoke.yml'
 }
 
 test_docker_and_github_cli_behavior() {
@@ -335,6 +336,44 @@ test_docker_and_github_cli_behavior() {
   assert_not_contains "$contents" 'GITHUB_TOKEN'
 }
 
+test_complete_ansible_cutover() {
+  local root_readme="${repository_root}/README.md"
+  local vm_readme="${repository_root}/vm/README.md"
+  local vm_definition="${repository_root}/vm/proteus.yaml"
+  local playbook="${repository_root}/provisioning/playbook.yml"
+  local smoke_tasks="${repository_root}/provisioning/tasks/smoke.yml"
+  local operator_docs
+
+  [[ ! -e "${repository_root}/vm/bootstrap.sh" ]] || fail 'the shell bootstrap still exists'
+
+  operator_docs="$(<"$root_readme")$(<"$vm_readme")$(<"$vm_definition")"
+  assert_not_contains "$operator_docs" 'limactl shell proteus < ./vm/bootstrap.sh'
+  assert_contains "$(<"$root_readme")" 'brew install lima ansible'
+  assert_contains "$(<"$vm_readme")" 'brew install lima ansible'
+  assert_contains "$(<"$root_readme")" 'VM Definition'
+  assert_contains "$(<"$root_readme")" 'Provisioning'
+  assert_contains "$(<"$root_readme")" 'Credential Enrollment'
+  assert_contains "$(<"$vm_readme")" 'VM Definition'
+  assert_contains "$(<"$vm_readme")" 'Provisioning'
+  assert_contains "$(<"$vm_readme")" 'Credential Enrollment'
+  assert_contains "$(<"$vm_definition")" './provision'
+  assert_contains "$operator_docs" 'fresh VMs'
+  assert_contains "$operator_docs" 'local-preferences.yml'
+  assert_contains "$operator_docs" '`system`'
+  assert_contains "$operator_docs" '`smoke`'
+  assert_contains "$operator_docs" 'unmanaged packages, files, and shell content'
+
+  [[ "$(grep -Fc 'ansible.builtin.import_tasks: tasks/smoke.yml' "$playbook")" -eq 1 ]] ||
+    fail 'the playbook must have one final smoke entry point'
+  assert_not_contains "$(<"$playbook")" 'tasks/javascript_smoke.yml'
+  assert_not_contains "$(<"$playbook")" 'tasks/javascript_shell_smoke.yml'
+  assert_not_contains "$(<"$playbook")" 'tasks/docker_github_cli_smoke.yml'
+  assert_contains "$(<"$smoke_tasks")" 'ansible.builtin.import_tasks: system_smoke.yml'
+  assert_contains "$(<"$smoke_tasks")" 'ansible.builtin.import_tasks: javascript_smoke.yml'
+  assert_contains "$(<"$smoke_tasks")" 'ansible.builtin.import_tasks: javascript_shell_smoke.yml'
+  assert_contains "$(<"$smoke_tasks")" 'ansible.builtin.import_tasks: docker_github_cli_smoke.yml'
+}
+
 trap 'rm -rf "${TEST_DIRECTORY:-}"' EXIT
 
 run_test 'reports missing Ansible' test_missing_ansible
@@ -354,3 +393,4 @@ run_test 'pins Docker and GitHub CLI repository inputs' test_docker_and_github_c
 run_test 'declares the Docker and GitHub CLI package sets' test_docker_and_github_cli_package_lists
 run_test 'wires Docker and GitHub CLI provisioning and smoke checks' test_docker_and_github_cli_playbook_wiring
 run_test 'covers runtime behavior without GitHub enrollment' test_docker_and_github_cli_behavior
+run_test 'completes the Ansible Provisioning cutover' test_complete_ansible_cutover

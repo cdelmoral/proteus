@@ -48,23 +48,7 @@
     - name: Provision Docker and GitHub CLI
       ansible.builtin.import_tasks: tasks/docker_github_cli.yml
 
-    - name: Verify the system baseline
+    - name: Run the complete read-only smoke phase
       ansible.builtin.import_tasks: tasks/smoke.yml
       tags:
-        - system
         - smoke
-
-    - name: Verify the JavaScript development tools
-      ansible.builtin.import_tasks: tasks/javascript_smoke.yml
-      tags:
-        - development_tools
-        - smoke
-
-    - name: Verify the JavaScript shell environment
-      ansible.builtin.import_tasks: tasks/javascript_shell_smoke.yml
-      tags:
-        - shell
-        - smoke
-
-    - name: Verify Docker and GitHub CLI
-      ansible.builtin.import_tasks: tasks/docker_github_cli_smoke.yml
