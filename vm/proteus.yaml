@@ -1,3 +1,4 @@
+---
 # Lima config for Proteus, a Credential-Isolated Dev VM.
 # Start with: limactl start --name=proteus ./vm/proteus.yaml
 
@@ -5,7 +6,10 @@ vmType: "vz"
 arch: "aarch64"
 
 images:
-  - location: "https://cloud-images.ubuntu.com/releases/resolute/release/ubuntu-26.04-server-cloudimg-arm64.img"
+  - location: >-
+      https://cloud-images.ubuntu.com/releases/resolute/release-20260823/ubuntu-26.04-server-cloudimg-arm64.img
+    digest: >-
+      sha256:00e2d9f09373125eb9040952ae3b8d5553fe3df8f5004c08838473a1f61b74bf
     arch: "aarch64"
     variant: "server"
 
@@ -25,7 +29,8 @@ ssh:
   loadDotSSHPubKeys: false
   forwardAgent: false
 
-# Docker Engine is installed by vm/bootstrap.sh. Lima's containerd is not needed.
+# Docker Engine is installed by vm/bootstrap.sh.
+# Lima's containerd is not needed.
 containerd:
   system: false
   user: false

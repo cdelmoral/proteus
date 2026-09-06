@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly instance="${PROTEUS_INSTANCE:-proteus}"
+readonly script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+readonly playbook="${script_dir}/provisioning/playbook.yml"
+
+if (( $# != 0 )); then
+  printf 'Usage: %s\n' "${0##*/}" >&2
+  exit 2
+fi
+
+if ! command -v ansible-playbook >/dev/null 2>&1; then
+  printf 'ansible-playbook is required. Install it with: brew install ansible\n' >&2
+  exit 1
+fi
+
+if ! command -v limactl >/dev/null 2>&1; then
+  printf 'limactl is required. Install it with: brew install lima\n' >&2
+  exit 1
+fi
+
+if ! instance_info="$(limactl list --tty=false --format='{{.Status}}|{{.Hostname}}|{{.SSHConfigFile}}' "$instance" 2>/dev/null)" ||
+  [[ -z "$instance_info" ]]; then
+  printf "Lima instance '%s' does not exist.\n" "$instance" >&2
+  exit 1
+fi
+
+IFS='|' read -r status hostname ssh_config <<<"$instance_info"
+
+if [[ "$status" != "Running" ]]; then
+  printf "Lima instance '%s' is not running (status: %s).\n" "$instance" "${status:-unknown}" >&2
+  exit 1
+fi
+
+if [[ -z "$hostname" ]]; then
+  printf "Lima did not report an SSH hostname for instance '%s'.\n" "$instance" >&2
+  exit 1
+fi
+
+if [[ -z "$ssh_config" || ! -f "$ssh_config" || ! -r "$ssh_config" ]]; then
+  printf "Lima SSH configuration is not readable: %s\n" "${ssh_config:-<empty>}" >&2
+  exit 1
+fi
+
+exec ansible-playbook \
+  --inventory "${hostname}," \
+  --ssh-common-args="-F ${ssh_config}" \
+  "$playbook"

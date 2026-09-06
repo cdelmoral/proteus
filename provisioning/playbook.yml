@@ -1,0 +1,37 @@
+---
+- name: Provision Proteus
+  hosts: all
+  gather_facts: false
+
+  pre_tasks:
+    - name: Ensure Python is available for Ansible modules
+      ansible.builtin.raw: |
+        if [ -x /usr/bin/python3 ]; then
+          exit 0
+        fi
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update
+        apt-get install -y python3
+        printf '%s\n' '__PROTEUS_PYTHON_INSTALLED__'
+      become: true
+      register: python_bootstrap
+      changed_when: "'__PROTEUS_PYTHON_INSTALLED__' in python_bootstrap.stdout"
+      tags:
+        - always
+
+    - name: Gather guest facts
+      ansible.builtin.setup:
+      tags:
+        - always
+
+  tasks:
+    - name: Apply the system baseline
+      ansible.builtin.import_tasks: tasks/system.yml
+      tags:
+        - system
+
+    - name: Verify the system baseline
+      ansible.builtin.import_tasks: tasks/smoke.yml
+      tags:
+        - system
+        - smoke
