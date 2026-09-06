@@ -24,6 +24,13 @@
       tags:
         - always
 
+  handlers:
+    - name: Refresh apt metadata after repository changes
+      ansible.builtin.apt:
+        update_cache: true
+      become: true
+      listen: Refresh apt metadata for third-party repositories
+
   tasks:
     - name: Apply the system baseline
       ansible.builtin.import_tasks: tasks/system.yml

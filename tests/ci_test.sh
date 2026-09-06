@@ -77,6 +77,9 @@ assert_contains "$integration_contents" 'ansible-playbook "${playbook_arguments[
 assert_contains "$integration_contents" '--user "$ci_user"'
 assert_contains "$integration_contents" 'sudoers.d'
 assert_contains "$integration_contents" 'second_run_output'
+assert_contains "$integration_contents" 'tests/pnpm_project_version.sh'
+assert_contains "$integration_contents" '.proteus-smoke-ran-unmanaged-shell'
+assert_contains "$integration_contents" '/usr/local/bin/corepack'
 assert_not_contains "$integration_contents" '--check'
 assert_not_contains "$integration_contents" 'connection: local'
 

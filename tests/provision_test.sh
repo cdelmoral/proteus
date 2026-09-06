@@ -318,11 +318,16 @@ test_docker_and_github_cli_playbook_wiring() {
 }
 
 test_docker_and_github_cli_behavior() {
+  local playbook="${repository_root}/provisioning/playbook.yml"
   local tasks="${repository_root}/provisioning/tasks/docker_github_cli.yml"
   local smoke="${repository_root}/provisioning/tasks/docker_github_cli_smoke.yml"
   local contents
-  contents="$(<"$tasks")$(<"$smoke")"
+  contents="$(<"$playbook")$(<"$tasks")$(<"$smoke")"
 
+  assert_contains "$contents" 'notify: Refresh apt metadata for third-party repositories'
+  assert_contains "$contents" 'ansible.builtin.meta: flush_handlers'
+  assert_contains "$contents" 'listen: Refresh apt metadata for third-party repositories'
+  assert_not_contains "$(<"$tasks")" 'changed_when: false'
   assert_contains "$contents" 'ansible.builtin.meta: reset_connection'
   assert_contains "$contents" 'append: true'
   assert_contains "$contents" 'enabled: true'
@@ -338,6 +343,7 @@ test_docker_and_github_cli_behavior() {
 }
 
 test_complete_ansible_cutover() {
+  local architecture_decision="${repository_root}/docs/adr/0001-run-ansible-from-macos.md"
   local root_readme="${repository_root}/README.md"
   local vm_readme="${repository_root}/vm/README.md"
   local vm_definition="${repository_root}/vm/proteus.yaml"
@@ -366,6 +372,9 @@ test_complete_ansible_cutover() {
   # shellcheck disable=SC2016
   assert_contains "$operator_docs" '`smoke`'
   assert_contains "$operator_docs" 'unmanaged packages, files, and shell content'
+  assert_contains "$(<"$architecture_decision")" 'Lima-generated SSH configuration'
+  assert_contains "$(<"$architecture_decision")" 'Credential Enrollment remains inside Proteus'
+  assert_contains "$(<"$architecture_decision")" 'reject host filesystem mounts, SSH key import, and SSH agent forwarding'
 
   [[ "$(grep -Fc 'ansible.builtin.import_tasks: tasks/smoke.yml' "$playbook")" -eq 1 ]] ||
     fail 'the playbook must have one final smoke entry point'

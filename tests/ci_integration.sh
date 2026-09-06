@@ -10,6 +10,8 @@ readonly private_key="${work_directory}/id_ed25519"
 readonly second_run_output="${work_directory}/second-run.log"
 readonly sudoers_file="${work_directory}/sudoers"
 readonly playbook="${repository_root}/provisioning/playbook.yml"
+readonly project_version_test="${repository_root}/tests/pnpm_project_version.sh"
+readonly unmanaged_shell_sentinel=".proteus-smoke-ran-unmanaged-shell"
 readonly -a ssh_options=(
   -o BatchMode=yes
   -o StrictHostKeyChecking=no
@@ -23,7 +25,16 @@ readonly -a playbook_arguments=(
   --ssh-common-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
   "$playbook"
 )
-trap 'rm -rf "$work_directory"' EXIT
+unmanaged_corepack_created=false
+
+cleanup() {
+  rm -rf "$work_directory"
+  if [[ "$unmanaged_corepack_created" == true ]]; then
+    sudo rm -f /usr/local/bin/corepack
+  fi
+}
+
+trap cleanup EXIT
 
 if [[ "$(uname -s)" != Linux || "$(uname -m)" != aarch64 ]]; then
   printf 'CI integration requires Linux on aarch64.\n' >&2
@@ -44,6 +55,13 @@ sudo install -d -o "$ci_user" -g "$ci_user" -m 0700 "/home/$ci_user/.ssh"
 sudo install -o "$ci_user" -g "$ci_user" -m 0600 "${private_key}.pub" "/home/$ci_user/.ssh/authorized_keys"
 sudo systemctl enable --now ssh
 
+if [[ ! -e /usr/local/bin/corepack && ! -L /usr/local/bin/corepack ]]; then
+  printf '%s\n' '#!/usr/bin/env sh' 'printf "unmanaged Corepack\n"' \
+    >"${work_directory}/corepack"
+  sudo install -o root -g root -m 0755 "${work_directory}/corepack" /usr/local/bin/corepack
+  unmanaged_corepack_created=true
+fi
+
 ssh_ready=false
 for _ in {1..10}; do
   if ssh "${ssh_options[@]}" -i "$private_key" "$ci_user@127.0.0.1" true; then
@@ -59,5 +77,13 @@ if [[ "$ssh_ready" != true ]]; then
 fi
 
 ANSIBLE_FORCE_COLOR=0 ansible-playbook "${playbook_arguments[@]}"
+ssh "${ssh_options[@]}" -i "$private_key" "$ci_user@127.0.0.1" \
+  /usr/bin/bash -s <"$project_version_test"
+ssh "${ssh_options[@]}" -i "$private_key" "$ci_user@127.0.0.1" \
+  "printf '%s\\n' 'touch \"\$HOME/$unmanaged_shell_sentinel\"' >>\"\$HOME/.bashrc\""
 ANSIBLE_FORCE_COLOR=0 ansible-playbook "${playbook_arguments[@]}" | tee "$second_run_output"
 "${repository_root}/tests/assert_converged.sh" "$second_run_output"
+ssh "${ssh_options[@]}" -i "$private_key" "$ci_user@127.0.0.1" \
+  "grep -Fqx 'touch \"\$HOME/$unmanaged_shell_sentinel\"' \"\$HOME/.bashrc\" &&
+  test ! -e \"\$HOME/$unmanaged_shell_sentinel\" &&
+  test -e /usr/local/bin/corepack"
