@@ -30,6 +30,11 @@
       tags:
         - system
 
+    - name: Apply local preferences
+      ansible.builtin.import_tasks: tasks/preferences.yml
+      tags:
+        - preferences
+
     - name: Verify the system baseline
       ansible.builtin.import_tasks: tasks/smoke.yml
       tags:

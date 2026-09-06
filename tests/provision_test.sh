@@ -28,6 +28,13 @@ assert_file_contains_line() {
   fail "expected $file to contain line: $expected"
 }
 
+assert_file_excludes() {
+  local file="$1"
+  local unexpected="$2"
+
+  [[ "$(<"$file")" != *"$unexpected"* ]] || fail "expected $file not to contain: $unexpected"
+}
+
 new_test_directory() {
   TEST_DIRECTORY="$(mktemp -d)"
   BIN_DIRECTORY="${TEST_DIRECTORY}/bin"
@@ -123,6 +130,27 @@ test_ansible_invocation() {
   assert_file_contains_line "$arguments_file" 'lima-ticket-2,'
   assert_file_contains_line "$arguments_file" "--ssh-common-args=-F ${SSH_CONFIG}"
   assert_file_contains_line "$arguments_file" "${repository_root}/provisioning/playbook.yml"
+  assert_file_excludes "$arguments_file" 'local_preferences_file'
+}
+
+test_local_preferences_invocation() {
+  local copied_root="${TEST_DIRECTORY}/repository"
+  local arguments_file="${TEST_DIRECTORY}/ansible-arguments"
+  local preferences_file="${copied_root}/provisioning/local-preferences.yml"
+  mkdir -p "${copied_root}/provisioning"
+  cp "$provision_command" "${copied_root}/provision"
+  printf '%s\n' 'git: {}' >"$preferences_file"
+  stub_command limactl "printf '%s\\n' 'Running|lima-proteus|${SSH_CONFIG}'"
+  stub_command ansible-playbook \
+    "printf '%s\\n' \"\$@\" >'${arguments_file}'"
+
+  PATH="${BIN_DIRECTORY}:/usr/bin:/bin" "${copied_root}/provision"
+
+  assert_file_contains_line "$arguments_file" '--extra-vars'
+  assert_file_contains_line \
+    "$arguments_file" \
+    "{\"local_preferences_file\":\"${preferences_file}\"}"
+  assert_file_contains_line "$arguments_file" "${copied_root}/provisioning/playbook.yml"
 }
 
 test_ansible_exit_status() {
@@ -182,6 +210,18 @@ test_baseline_package_list() {
   assert_contains "$(<"$variables")" "$expected_packages"
 }
 
+test_local_preferences_files() {
+  local example="${repository_root}/provisioning/local-preferences.example.yml"
+  local expected
+  expected=$'---\ngit:\n'
+  expected+=$'  name: Example Name\n'
+  expected+=$'  email: example@example.invalid'
+
+  [[ "$(<"$example")" == "$expected" ]] || fail 'local preferences example changed unexpectedly'
+  git -C "$repository_root" check-ignore --quiet provisioning/local-preferences.yml ||
+    fail 'the real local preferences file is not ignored'
+}
+
 trap 'rm -rf "${TEST_DIRECTORY:-}"' EXIT
 
 run_test 'reports missing Ansible' test_missing_ansible
@@ -189,7 +229,9 @@ run_test 'reports a missing Lima instance' test_missing_instance
 run_test 'reports a stopped Lima instance' test_stopped_instance
 run_test 'reports an unreadable SSH configuration' test_unreadable_ssh_config
 run_test 'uses Lima connection data for Ansible' test_ansible_invocation
+run_test 'passes an existing local preferences file to Ansible' test_local_preferences_invocation
 run_test 'preserves the Ansible exit status' test_ansible_exit_status
 run_test 'rejects unsupported arguments' test_rejects_arguments
 run_test 'pins the Ubuntu image and digest' test_pinned_image
 run_test 'keeps the existing baseline package set' test_baseline_package_list
+run_test 'documents and ignores local preferences' test_local_preferences_files
