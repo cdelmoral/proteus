@@ -30,8 +30,14 @@
       tags:
         - system
 
+    - name: Provision Docker and GitHub CLI
+      ansible.builtin.import_tasks: tasks/docker_github_cli.yml
+
     - name: Verify the system baseline
       ansible.builtin.import_tasks: tasks/smoke.yml
       tags:
         - system
         - smoke
+
+    - name: Verify Docker and GitHub CLI
+      ansible.builtin.import_tasks: tasks/docker_github_cli_smoke.yml

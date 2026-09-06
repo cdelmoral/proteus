@@ -17,6 +17,13 @@ assert_contains() {
   [[ "$haystack" == *"$needle"* ]] || fail "expected output to contain: $needle"
 }
 
+assert_not_contains() {
+  local haystack="$1"
+  local needle="$2"
+
+  [[ "$haystack" != *"$needle"* ]] || fail "expected output not to contain: $needle"
+}
+
 assert_file_contains_line() {
   local file="$1"
   local expected="$2"
@@ -182,6 +189,66 @@ test_baseline_package_list() {
   assert_contains "$(<"$variables")" "$expected_packages"
 }
 
+test_docker_and_github_cli_repository_inputs() {
+  local variables="${repository_root}/provisioning/group_vars/all.yml"
+  local contents
+  contents="$(<"$variables")"
+
+  assert_contains "$contents" 'docker_repository_key_url: https://download.docker.com/linux/ubuntu/gpg'
+  assert_contains "$contents" 'sha256:1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570'
+  assert_contains "$contents" 'docker_repository_uri: https://download.docker.com/linux/ubuntu'
+  assert_contains "$contents" 'docker_repository_suite: resolute'
+  assert_contains "$contents" 'docker_repository_architecture: arm64'
+  assert_contains "$contents" 'https://cli.github.com/packages/githubcli-archive-keyring.gpg'
+  assert_contains "$contents" 'sha256:6084d5d7bd8e288441e0e94fc6275570895da18e6751f70f057485dc2d1a811b'
+  assert_contains "$contents" 'github_cli_repository_uri: https://cli.github.com/packages'
+  assert_contains "$contents" 'github_cli_repository_suite: stable'
+  assert_contains "$contents" 'github_cli_repository_architecture: arm64'
+}
+
+test_docker_and_github_cli_package_lists() {
+  local variables="${repository_root}/provisioning/group_vars/all.yml"
+  local expected_packages
+  expected_packages=$'docker_packages:\n'
+  expected_packages+=$'  - containerd.io\n'
+  expected_packages+=$'  - docker-buildx-plugin\n'
+  expected_packages+=$'  - docker-ce\n'
+  expected_packages+=$'  - docker-ce-cli\n'
+  expected_packages+=$'  - docker-compose-plugin\n'
+
+  assert_contains "$(<"$variables")" "$expected_packages"
+  assert_contains "$(<"$variables")" $'github_cli_packages:\n  - gh'
+}
+
+test_docker_and_github_cli_playbook_wiring() {
+  local playbook="${repository_root}/provisioning/playbook.yml"
+  local contents
+  contents="$(<"$playbook")"
+
+  assert_contains "$contents" 'ansible.builtin.import_tasks: tasks/docker_github_cli.yml'
+  assert_contains "$contents" 'ansible.builtin.import_tasks: tasks/docker_github_cli_smoke.yml'
+}
+
+test_docker_and_github_cli_behavior() {
+  local tasks="${repository_root}/provisioning/tasks/docker_github_cli.yml"
+  local smoke="${repository_root}/provisioning/tasks/docker_github_cli_smoke.yml"
+  local contents
+  contents="$(<"$tasks")$(<"$smoke")"
+
+  assert_contains "$contents" 'ansible.builtin.meta: reset_connection'
+  assert_contains "$contents" 'append: true'
+  assert_contains "$contents" 'enabled: true'
+  assert_contains "$contents" 'docker_repository_key.stat.checksum'
+  assert_contains "$contents" 'github_cli_repository_key.stat.checksum'
+  assert_contains "$contents" 'Signed-By: '
+  assert_contains "$contents" 'docker_command_checks'
+  assert_contains "$contents" 'gh'
+  assert_contains "$contents" '--version'
+  assert_not_contains "$contents" 'gh auth'
+  assert_not_contains "$contents" '.config/gh'
+  assert_not_contains "$contents" 'GITHUB_TOKEN'
+}
+
 trap 'rm -rf "${TEST_DIRECTORY:-}"' EXIT
 
 run_test 'reports missing Ansible' test_missing_ansible
@@ -193,3 +260,7 @@ run_test 'preserves the Ansible exit status' test_ansible_exit_status
 run_test 'rejects unsupported arguments' test_rejects_arguments
 run_test 'pins the Ubuntu image and digest' test_pinned_image
 run_test 'keeps the existing baseline package set' test_baseline_package_list
+run_test 'pins Docker and GitHub CLI repository inputs' test_docker_and_github_cli_repository_inputs
+run_test 'declares the Docker and GitHub CLI package sets' test_docker_and_github_cli_package_lists
+run_test 'wires Docker and GitHub CLI provisioning and smoke checks' test_docker_and_github_cli_playbook_wiring
+run_test 'covers runtime behavior without GitHub enrollment' test_docker_and_github_cli_behavior

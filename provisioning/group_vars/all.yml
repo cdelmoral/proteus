@@ -28,3 +28,32 @@ baseline_commands:
   - rg
   - unzip
   - wget
+
+docker_packages:
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-ce
+  - docker-ce-cli
+  - docker-compose-plugin
+docker_repository_key_url: https://download.docker.com/linux/ubuntu/gpg
+docker_repository_key_checksum: >-
+  sha256:1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570
+docker_repository_key_path: /etc/apt/keyrings/docker.asc
+docker_repository_source_path: /etc/apt/sources.list.d/docker.sources
+docker_repository_uri: https://download.docker.com/linux/ubuntu
+docker_repository_suite: resolute
+docker_repository_component: stable
+docker_repository_architecture: arm64
+
+github_cli_packages:
+  - gh
+github_cli_repository_key_url: >-
+  https://cli.github.com/packages/githubcli-archive-keyring.gpg
+github_cli_repository_key_checksum: >-
+  sha256:6084d5d7bd8e288441e0e94fc6275570895da18e6751f70f057485dc2d1a811b
+github_cli_repository_key_path: /etc/apt/keyrings/githubcli-archive-keyring.gpg
+github_cli_repository_source_path: /etc/apt/sources.list.d/github-cli.sources
+github_cli_repository_uri: https://cli.github.com/packages
+github_cli_repository_suite: stable
+github_cli_repository_component: main
+github_cli_repository_architecture: arm64
