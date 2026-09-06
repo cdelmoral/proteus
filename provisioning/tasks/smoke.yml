@@ -1,62 +1,23 @@
 ---
-- name: Verify the supported guest platform
-  ansible.builtin.assert:
-    that:
-      - ansible_distribution == "Ubuntu"
-      - ansible_distribution_version == "26.04"
-      - ansible_architecture == "aarch64"
-    fail_msg: >-
-      Proteus requires Ubuntu 26.04 on aarch64, but found
-      {{ ansible_distribution }} {{ ansible_distribution_version }} on
-      {{ ansible_architecture }}.
+- name: Verify the system baseline
+  ansible.builtin.import_tasks: system_smoke.yml
+  tags:
+    - system
+    - smoke
 
-- name: Check baseline commands
-  ansible.builtin.command:
-    argv:
-      - /usr/bin/env
-      - sh
-      - -c
-      - 'command -v "$1" >/dev/null'
-      - proteus-smoke
-      - "{{ item }}"
-  loop: "{{ baseline_commands }}"
-  register: baseline_command_checks
-  changed_when: false
-  failed_when: false
+- name: Verify the JavaScript development tools
+  ansible.builtin.import_tasks: javascript_smoke.yml
+  tags:
+    - development_tools
+    - smoke
 
-- name: Verify baseline commands
-  ansible.builtin.assert:
-    that:
-      - >-
-        baseline_command_checks.results
-        | selectattr('rc', 'ne', 0)
-        | list
-        | length == 0
-    fail_msg: >-
-      Missing baseline commands:
-      {{ baseline_command_checks.results
-         | selectattr('rc', 'ne', 0)
-         | map(attribute='item')
-         | join(', ') }}
+- name: Verify the JavaScript shell environment
+  ansible.builtin.import_tasks: javascript_shell_smoke.yml
+  tags:
+    - shell
+    - smoke
 
-- name: Inspect the projects directory
-  ansible.builtin.stat:
-    path: "{{ ansible_user_dir }}/projects"
-  register: projects_directory
-
-- name: Verify the projects directory
-  ansible.builtin.assert:
-    that:
-      - projects_directory.stat.isdir
-      - projects_directory.stat.pw_name == ansible_user_id
-    fail_msg: >-
-      {{ ansible_user_dir }}/projects must be a directory owned by
-      {{ ansible_user_id }}.
-
-- name: Validate the Bash configuration
-  ansible.builtin.command:
-    argv:
-      - /usr/bin/bash
-      - -n
-      - "{{ ansible_user_dir }}/.bashrc"
-  changed_when: false
+- name: Verify Docker and GitHub CLI
+  ansible.builtin.import_tasks: docker_github_cli_smoke.yml
+  tags:
+    - smoke
