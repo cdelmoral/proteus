@@ -4,6 +4,17 @@ set -euo pipefail
 readonly instance="${PROTEUS_INSTANCE:-proteus}"
 readonly script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 readonly playbook="${script_dir}/provisioning/playbook.yml"
+readonly local_preferences_file="${script_dir}/provisioning/local-preferences.yml"
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\r'/\\r}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "$value"
+}
 
 if (( $# != 0 )); then
   printf 'Usage: %s\n' "${0##*/}" >&2
@@ -43,7 +54,16 @@ if [[ -z "$ssh_config" || ! -f "$ssh_config" || ! -r "$ssh_config" ]]; then
   exit 1
 fi
 
-exec ansible-playbook \
-  --inventory "${hostname}," \
-  --ssh-common-args="-F ${ssh_config}" \
-  "$playbook"
+ansible_arguments=(
+  --inventory
+  "${hostname},"
+  "--ssh-common-args=-F ${ssh_config}"
+)
+if [[ -f "$local_preferences_file" ]]; then
+  ansible_arguments+=(
+    --extra-vars
+    "{\"local_preferences_file\":\"$(json_escape "$local_preferences_file")\"}"
+  )
+fi
+
+exec ansible-playbook "${ansible_arguments[@]}" "$playbook"
