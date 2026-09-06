@@ -77,6 +77,18 @@ The playbook records these maintenance tags: `system`, `preferences`, `developme
 
 Provisioning fails without changing VM power state when Ansible or Lima is missing, the `proteus` instance does not exist or is stopped, Lima's generated SSH configuration is unreadable, or Ansible reports a failure.
 
+## Disposable Lima acceptance
+
+Run the full macOS-to-guest acceptance check on an Apple silicon Mac with Lima and Ansible installed:
+
+```bash
+make lima-acceptance
+```
+
+The check validates the production VM Definition, creates a uniquely named `proteus-acceptance-*` instance from it, and disables only that instance's development-port forwards. The normal `proteus` instance may keep running because the disposable VM does not claim ports 3000, 5173, 8000, or 8080.
+
+The check calls `./provision` twice against the disposable instance. The first run includes the complete production smoke phase. The second run must report `changed=0`, `unreachable=0`, and `failed=0`. An exit trap deletes the exact instance created by the check, including when Provisioning or the convergence assertion fails. It refuses to use an existing name and cannot target the normal `proteus` instance.
+
 See [`vm/README.md`](./vm/README.md) for Credential Enrollment, Docker security, and port forwarding.
 
 ## Isolation boundary

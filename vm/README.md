@@ -36,6 +36,8 @@ The playbook has `system`, `preferences`, `development_tools`, `shell`, `docker`
 
 Provisioning never starts or stops the VM. It reports an error when a host prerequisite is missing, the instance does not exist or is stopped, Lima's generated SSH configuration is unreadable, or the playbook fails.
 
+To test this workflow through a fresh Lima guest without changing the normal `proteus` instance, run `make lima-acceptance` from the repository root. The disposable acceptance instance uses this production VM Definition and the `./provision` command. Its fixed development-port forwards are disabled so `proteus` can remain running. The check runs Provisioning twice, requires zero changes on the second run, and deletes only the temporary `proteus-acceptance-*` instance it created.
+
 ### 3. Enter Proteus
 
 ```bash
