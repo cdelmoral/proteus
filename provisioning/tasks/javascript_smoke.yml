@@ -27,17 +27,6 @@
   register: pnpm_version_check
   changed_when: false
 
-- name: Read pnpm project-version handling policy
-  ansible.builtin.command:
-    argv:
-      - "{{ pnpm_install_dir }}/pnpm"
-      - config
-      - get
-      - --global
-      - pmOnFail
-  register: pnpm_project_version_policy
-  changed_when: false
-
 - name: Find the managed Node installation for smoke checks
   ansible.builtin.command:
     argv:
@@ -53,7 +42,6 @@
       - mise_version_check.stdout.split()[0] == mise_version
       - node_version_check.stdout | trim == "v" ~ node_version
       - pnpm_version_check.stdout | trim == pnpm_version
-      - pnpm_project_version_policy.stdout | trim == "download"
     fail_msg: >-
       Expected mise {{ mise_version }}, Node {{ node_version }}, and pnpm
       {{ pnpm_version }} with project-aware selection. Found
@@ -73,6 +61,8 @@
       - -c
       - 'command -v corepack'
   register: corepack_command_check
+  environment:
+    PATH: "{{ smoke_managed_node.stdout | trim }}/bin:/usr/bin:/bin"
   changed_when: false
   failed_when: false
 
@@ -106,7 +96,6 @@
       - "{{ pnpm_archive }}"
       - "{{ ansible_user_dir }}/.local/bin/mise"
       - "{{ ansible_user_dir }}/.config/mise/config.toml"
-      - "{{ ansible_user_dir }}/.config/pnpm/config.yaml"
       - "!"
       - -user
       - "{{ ansible_user_id }}"

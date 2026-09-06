@@ -36,6 +36,8 @@ new_test_directory() {
   mkdir -p "${TEST_REPOSITORY}/tests" "${TEST_REPOSITORY}/vm" "$BIN_DIRECTORY"
   cp "$acceptance_command" "${TEST_REPOSITORY}/tests/lima_acceptance.sh"
   cp "$convergence_check" "${TEST_REPOSITORY}/tests/assert_converged.sh"
+  cp "${repository_root}/tests/pnpm_project_version.sh" \
+    "${TEST_REPOSITORY}/tests/pnpm_project_version.sh"
   printf '%s\n' 'production VM definition' >"${TEST_REPOSITORY}/vm/proteus.yaml"
   : >"$LIMA_LOG"
   : >"$PROVISION_LOG"
@@ -55,6 +57,8 @@ stub_command() {
 
 install_stubs() {
   stub_command "${BIN_DIRECTORY}/ansible-playbook" 'exit 0'
+  # The stub body must expand variables when the generated script runs.
+  # shellcheck disable=SC2016
   stub_command "${BIN_DIRECTORY}/limactl" '
 printf "%s\n" "$*" >>"$LIMA_LOG"
 case "$1" in
@@ -68,6 +72,8 @@ case "$1" in
     ;;
 esac
 '
+  # The stub body must expand variables when the generated script runs.
+  # shellcheck disable=SC2016
   stub_command "${TEST_REPOSITORY}/provision" '
 count=0
 [[ ! -f "$PROVISION_COUNT" ]] || count="$(<"$PROVISION_COUNT")"
@@ -114,6 +120,7 @@ test_complete_acceptance_lifecycle() {
   expected_lima_log+="list --tty=false --format={{.Name}} proteus-acceptance-test-123"$'\n'
   expected_lima_log+="create --tty=false --name=proteus-acceptance-test-123 --set=.portForwards=[] ${TEST_REPOSITORY}/vm/proteus.yaml"$'\n'
   expected_lima_log+="start --tty=false proteus-acceptance-test-123"$'\n'
+  expected_lima_log+="shell --tty=false proteus-acceptance-test-123 /usr/bin/bash -s"$'\n'
   expected_lima_log+="delete --tty=false --force proteus-acceptance-test-123"
   [[ "$(<"$LIMA_LOG")" == "$expected_lima_log" ]] || fail "unexpected Lima lifecycle: $(<"$LIMA_LOG")"
   [[ "$(<"$PROVISION_COUNT")" == 2 ]] || fail 'Provisioning did not run twice'

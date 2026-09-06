@@ -128,26 +128,3 @@
     not (pnpm_executable.stat.isreg | default(false))
     or not (pnpm_executable.stat.executable | default(false))
     or not (pnpm_runtime.stat.isdir | default(false))
-
-- name: Read pnpm project-version handling policy
-  ansible.builtin.command:
-    argv:
-      - "{{ pnpm_install_dir }}/pnpm"
-      - config
-      - get
-      - --global
-      - pmOnFail
-  register: configured_pnpm_project_version_policy
-  changed_when: false
-
-- name: Enable pnpm project-version downloads
-  ansible.builtin.command:
-    argv:
-      - "{{ pnpm_install_dir }}/pnpm"
-      - config
-      - set
-      - --global
-      - pmOnFail
-      - download
-  when: configured_pnpm_project_version_policy.stdout | trim != "download"
-  changed_when: true

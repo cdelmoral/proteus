@@ -6,6 +6,7 @@ readonly repository_root
 readonly vm_definition="${repository_root}/vm/proteus.yaml"
 readonly provision_command="${repository_root}/provision"
 readonly convergence_check="${repository_root}/tests/assert_converged.sh"
+readonly project_version_test="${repository_root}/tests/pnpm_project_version.sh"
 generated_suffix="$(date -u +%Y%m%d%H%M%S)-$$-${RANDOM}"
 readonly generated_suffix
 readonly instance="${PROTEUS_ACCEPTANCE_INSTANCE:-proteus-acceptance-${generated_suffix}}"
@@ -67,6 +68,9 @@ limactl start --tty=false "$instance"
 
 printf "Running Provisioning against '%s'.\n" "$instance"
 PROTEUS_INSTANCE="$instance" "$provision_command"
+
+printf "Testing project-level pnpm selection in '%s'.\n" "$instance"
+limactl shell --tty=false "$instance" /usr/bin/bash -s <"$project_version_test"
 
 second_run_output="$(mktemp)"
 printf "Running Provisioning against '%s' again to verify convergence.\n" "$instance"

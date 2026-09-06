@@ -19,6 +19,7 @@
     owner: root
     group: root
     mode: "0644"
+  notify: Refresh apt metadata for third-party repositories
   become: true
   tags:
     - docker
@@ -36,6 +37,7 @@
       Components: {{ docker_repository_component }}
       Architectures: {{ docker_repository_architecture }}
       Signed-By: {{ docker_repository_key_path }}
+  notify: Refresh apt metadata for third-party repositories
   become: true
   tags:
     - docker
@@ -48,6 +50,7 @@
     owner: root
     group: root
     mode: "0644"
+  notify: Refresh apt metadata for third-party repositories
   become: true
   tags:
     - github_cli
@@ -65,15 +68,13 @@
       Components: {{ github_cli_repository_component }}
       Architectures: {{ github_cli_repository_architecture }}
       Signed-By: {{ github_cli_repository_key_path }}
+  notify: Refresh apt metadata for third-party repositories
   become: true
   tags:
     - github_cli
 
-- name: Refresh apt metadata for third-party repositories
-  ansible.builtin.apt:
-    update_cache: true
-  become: true
-  changed_when: false
+- name: Refresh apt metadata before installing third-party packages
+  ansible.builtin.meta: flush_handlers
   tags:
     - docker
     - github_cli
