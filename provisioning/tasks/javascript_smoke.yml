@@ -7,6 +7,7 @@
   register: mise_version_check
   environment:
     HOME: "{{ ansible_user_dir }}"
+    XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"
   changed_when: false
 
 - name: Read the installed Node version through mise
@@ -21,6 +22,7 @@
   register: node_version_check
   environment:
     HOME: "{{ ansible_user_dir }}"
+    XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"
   changed_when: false
 
 - name: Read the installed pnpm version
@@ -40,6 +42,7 @@
   register: smoke_managed_node
   environment:
     HOME: "{{ ansible_user_dir }}"
+    XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"
   changed_when: false
 
 - name: Verify exact JavaScript tool versions
@@ -69,6 +72,7 @@
   register: corepack_command_check
   environment:
     HOME: "{{ ansible_user_dir }}"
+    XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"
     PATH: "{{ smoke_managed_node.stdout | trim }}/bin:/usr/bin:/bin"
   changed_when: false
   failed_when: false
