@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export XDG_CONFIG_HOME="$HOME/.config"
+
 readonly baseline_pnpm="$HOME/.local/share/proteus/pnpm/12.3.4/pnpm"
 readonly mise="$HOME/.local/bin/mise"
 readonly expected_project_pnpm_version="12.3.3"

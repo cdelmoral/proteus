@@ -34,9 +34,7 @@
       - --global
       - tools.node
   register: selected_node_version
-  environment:
-    HOME: "{{ ansible_user_dir }}"
-    XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"
+  environment: "{{ managed_user_environment }}"
   changed_when: false
   failed_when: false
 
@@ -47,9 +45,7 @@
       - where
       - "node@{{ node_version }}"
   register: installed_node
-  environment:
-    HOME: "{{ ansible_user_dir }}"
-    XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"
+  environment: "{{ managed_user_environment }}"
   changed_when: false
   failed_when: false
 
@@ -61,11 +57,11 @@
       - --global
       - --pin
       - "node@{{ node_version }}"
-  environment:
-    HOME: "{{ ansible_user_dir }}"
-    XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"
-    MISE_NODE_VERIFY: "true"
-    MISE_YES: "1"
+  environment: >-
+    {{ managed_user_environment | combine({
+      "MISE_NODE_VERIFY": "true",
+      "MISE_YES": "1"
+    }) }}
   when: >-
     selected_node_version.rc != 0
     or selected_node_version.stdout | trim != node_version
@@ -79,9 +75,7 @@
       - where
       - "node@{{ node_version }}"
   register: managed_node
-  environment:
-    HOME: "{{ ansible_user_dir }}"
-    XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"
+  environment: "{{ managed_user_environment }}"
   changed_when: false
 
 - name: Remove Corepack bundled with Node
