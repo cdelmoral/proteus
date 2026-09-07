@@ -24,9 +24,11 @@ set -euo pipefail
 
 managed_home="$(CDPATH='' cd -- "$(dirname -- "$0")/../../../../.." && pwd)"
 readonly managed_home
+readonly managed_config_home="${managed_home}/.config"
+readonly mise_config_home="${XDG_CONFIG_HOME:-${HOME}/.config}"
 
-if [[ "$HOME" != "$managed_home" ]]; then
-  printf 'mise ERROR failed create_dir_all: %s/.config/mise\n' "$HOME" >&2
+if [[ "$HOME" != "$managed_home" || "$mise_config_home" != "$managed_config_home" ]]; then
+  printf 'mise ERROR failed create_dir_all: %s/mise\n' "$mise_config_home" >&2
   exit 1
 fi
 
@@ -35,15 +37,15 @@ case "$1" in
     exit 1
     ;;
   where)
-    [[ -e "$HOME/.config/mise/config.toml" ]] || exit 1
+    [[ -e "$mise_config_home/mise/config.toml" ]] || exit 1
     printf '%s\n' "$HOME/.local/share/mise/installs/node/24.20.0"
     ;;
   use)
     mkdir -p \
-      "$HOME/.config/mise" \
+      "$mise_config_home/mise" \
       "$HOME/.local/share/mise/installs/node/24.20.0/bin" \
       "$HOME/.local/share/mise/installs/node/24.20.0/lib/node_modules/corepack"
-    : >"$HOME/.config/mise/config.toml"
+    : >"$mise_config_home/mise/config.toml"
     : >"$HOME/.local/share/mise/installs/node/24.20.0/bin/corepack"
     ;;
   *)
@@ -84,7 +86,8 @@ cat >"$playbook" <<EOF
 EOF
 
 playbook_output="${test_directory}/playbook.log"
-if ! HOME="$controller_home" ANSIBLE_FORCE_COLOR=0 \
+if ! HOME="$controller_home" XDG_CONFIG_HOME="$controller_home/.config" \
+  ANSIBLE_FORCE_COLOR=0 \
   ansible-playbook --inventory localhost, "$playbook" >"$playbook_output" 2>&1; then
   printf '%s\n' "$(<"$playbook_output")" >&2
   exit 1

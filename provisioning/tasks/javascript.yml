@@ -36,6 +36,7 @@
   register: selected_node_version
   environment:
     HOME: "{{ ansible_user_dir }}"
+    XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"
   changed_when: false
   failed_when: false
 
@@ -48,6 +49,7 @@
   register: installed_node
   environment:
     HOME: "{{ ansible_user_dir }}"
+    XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"
   changed_when: false
   failed_when: false
 
@@ -61,6 +63,7 @@
       - "node@{{ node_version }}"
   environment:
     HOME: "{{ ansible_user_dir }}"
+    XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"
     MISE_NODE_VERIFY: "true"
     MISE_YES: "1"
   when: >-
@@ -78,6 +81,7 @@
   register: managed_node
   environment:
     HOME: "{{ ansible_user_dir }}"
+    XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"
   changed_when: false
 
 - name: Remove Corepack bundled with Node
