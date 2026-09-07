@@ -40,6 +40,7 @@
       - --
       - "{{ ansible_user_dir }}/.bashrc"
   register: javascript_shell_check
+  environment: "{{ managed_user_environment }}"
   changed_when: false
 
 - name: Verify the managed JavaScript shell environment

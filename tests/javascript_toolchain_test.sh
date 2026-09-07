@@ -42,7 +42,7 @@ assert_contains "$tasks" 'node@{{ node_version }}'
 assert_contains "$tasks" '{{ managed_node.stdout | trim }}/bin/corepack'
 assert_contains "$tasks" '{{ managed_node.stdout | trim }}/lib/node_modules/corepack'
 assert_contains "$smoke_tasks" 'smoke_managed_node.stdout | trim'
-assert_contains "$smoke_tasks" 'PATH: "{{ smoke_managed_node.stdout | trim }}/bin:/usr/bin:/bin"'
+assert_contains "$smoke_tasks" '"PATH": (smoke_managed_node.stdout | trim) ~ "/bin:/usr/bin:/bin"'
 assert_contains "$shell_tasks" '# {mark} ANSIBLE MANAGED BLOCK: Proteus JavaScript toolchain'
 # The assertion checks a literal shell block embedded in Ansible.
 # shellcheck disable=SC2016

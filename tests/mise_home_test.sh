@@ -11,6 +11,7 @@ readonly fixture_directory="${test_directory}/fixtures"
 readonly mise_fixture="${fixture_directory}/mise"
 readonly pnpm_fixture="${fixture_directory}/pnpm.tar.gz"
 readonly playbook="${test_directory}/playbook.yml"
+readonly project_version_test="${repository_root}/tests/pnpm_project_version.sh"
 trap 'rm -rf "$test_directory"' EXIT
 
 mkdir -p \
@@ -22,7 +23,12 @@ cat >"$mise_fixture" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
-managed_home="$(CDPATH='' cd -- "$(dirname -- "$0")/../../../../.." && pwd)"
+mise_path="$0"
+if [[ -L "$mise_path" ]]; then
+  mise_path="$(readlink "$mise_path")"
+fi
+readonly mise_path
+managed_home="$(CDPATH='' cd -- "$(dirname -- "$mise_path")/../../../../.." && pwd)"
 readonly managed_home
 readonly managed_config_home="${managed_home}/.config"
 readonly mise_config_home="${XDG_CONFIG_HOME:-${HOME}/.config}"
@@ -33,8 +39,17 @@ if [[ "$HOME" != "$managed_home" || "$mise_config_home" != "$managed_config_home
 fi
 
 case "$1" in
+  --version)
+    printf '%s\n' test
+    ;;
   config)
     exit 1
+    ;;
+  exec)
+    if [[ "$*" == *'command -v corepack'* ]]; then
+      exit 1
+    fi
+    printf '%s\n' v24.20.0
     ;;
   where)
     [[ -e "$mise_config_home/mise/config.toml" ]] || exit 1
@@ -55,7 +70,27 @@ esac
 EOF
 chmod +x "$mise_fixture"
 
-printf '#!/usr/bin/env sh\nprintf "12.3.4\\n"\n' >"${fixture_directory}/pnpm/pnpm"
+cat >"${fixture_directory}/pnpm/pnpm" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+managed_home="$(CDPATH='' cd -- "$(dirname -- "$0")/../../../../.." && pwd)"
+readonly managed_home
+readonly managed_config_home="${managed_home}/.config"
+readonly pnpm_config_home="${XDG_CONFIG_HOME:-${HOME}/.config}"
+
+if [[ "$HOME" != "$managed_home" || "$pnpm_config_home" != "$managed_config_home" ]]; then
+  printf 'Failed to read pnpm-workspace.yaml at %s/pnpm/config.yaml\n' \
+    "$pnpm_config_home" >&2
+  exit 1
+fi
+
+if [[ -f package.json && "$(<package.json)" == *'"packageManager": "pnpm@12.3.3"'* ]]; then
+  printf '%s\n' 12.3.3
+else
+  printf '%s\n' 12.3.4
+fi
+EOF
 chmod +x "${fixture_directory}/pnpm/pnpm"
 cp "${fixture_directory}/pnpm/pnpm" \
   "$managed_home/.local/share/proteus/pnpm/12.3.4/pnpm"
@@ -63,7 +98,7 @@ tar -czf "$pnpm_fixture" -C "${fixture_directory}/pnpm" .
 
 cat >"$playbook" <<EOF
 ---
-- name: Verify mise uses the managed user's home
+- name: Verify user-local tools use the managed user's home
   hosts: localhost
   connection: local
   gather_facts: false
@@ -80,9 +115,15 @@ cat >"$playbook" <<EOF
     pnpm_checksum: ""
     pnpm_archive: "{{ ansible_user_dir }}/.cache/proteus/pnpm.tar.gz"
     pnpm_install_dir: "{{ ansible_user_dir }}/.local/share/proteus/pnpm/{{ pnpm_version }}"
+    managed_user_environment:
+      HOME: "{{ ansible_user_dir }}"
+      XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"
+    ansible_user_id: "$(id -un)"
   tasks:
     - name: Exercise the production JavaScript tasks
       ansible.builtin.import_tasks: "$repository_root/provisioning/tasks/javascript.yml"
+    - name: Exercise the production JavaScript smoke tasks
+      ansible.builtin.import_tasks: "$repository_root/provisioning/tasks/javascript_smoke.yml"
 EOF
 
 playbook_output="${test_directory}/playbook.log"
@@ -95,5 +136,7 @@ fi
 
 [[ -e "$managed_home/.config/mise/config.toml" ]]
 [[ ! -e "$controller_home/.config/mise" ]]
+HOME="$managed_home" XDG_CONFIG_HOME="$controller_home/.config" \
+  /bin/bash "$project_version_test" >/dev/null
 
-printf 'ok - mise uses the managed user home\n'
+printf 'ok - user-local tools use the managed user home\n'

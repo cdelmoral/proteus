@@ -5,9 +5,7 @@
       - "{{ ansible_user_dir }}/.local/bin/mise"
       - --version
   register: mise_version_check
-  environment:
-    HOME: "{{ ansible_user_dir }}"
-    XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"
+  environment: "{{ managed_user_environment }}"
   changed_when: false
 
 - name: Read the installed Node version through mise
@@ -20,9 +18,7 @@
       - node
       - --version
   register: node_version_check
-  environment:
-    HOME: "{{ ansible_user_dir }}"
-    XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"
+  environment: "{{ managed_user_environment }}"
   changed_when: false
 
 - name: Read the installed pnpm version
@@ -31,6 +27,7 @@
       - "{{ pnpm_install_dir }}/pnpm"
       - --version
   register: pnpm_version_check
+  environment: "{{ managed_user_environment }}"
   changed_when: false
 
 - name: Find the managed Node installation for smoke checks
@@ -40,9 +37,7 @@
       - where
       - "node@{{ node_version }}"
   register: smoke_managed_node
-  environment:
-    HOME: "{{ ansible_user_dir }}"
-    XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"
+  environment: "{{ managed_user_environment }}"
   changed_when: false
 
 - name: Verify exact JavaScript tool versions
@@ -70,10 +65,10 @@
       - -c
       - 'command -v corepack'
   register: corepack_command_check
-  environment:
-    HOME: "{{ ansible_user_dir }}"
-    XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"
-    PATH: "{{ smoke_managed_node.stdout | trim }}/bin:/usr/bin:/bin"
+  environment: >-
+    {{ managed_user_environment | combine({
+      "PATH": (smoke_managed_node.stdout | trim) ~ "/bin:/usr/bin:/bin"
+    }) }}
   changed_when: false
   failed_when: false
 
