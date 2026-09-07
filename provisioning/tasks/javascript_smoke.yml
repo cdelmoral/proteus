@@ -5,6 +5,8 @@
       - "{{ ansible_user_dir }}/.local/bin/mise"
       - --version
   register: mise_version_check
+  environment:
+    HOME: "{{ ansible_user_dir }}"
   changed_when: false
 
 - name: Read the installed Node version through mise
@@ -17,6 +19,8 @@
       - node
       - --version
   register: node_version_check
+  environment:
+    HOME: "{{ ansible_user_dir }}"
   changed_when: false
 
 - name: Read the installed pnpm version
@@ -34,6 +38,8 @@
       - where
       - "node@{{ node_version }}"
   register: smoke_managed_node
+  environment:
+    HOME: "{{ ansible_user_dir }}"
   changed_when: false
 
 - name: Verify exact JavaScript tool versions
@@ -62,6 +68,7 @@
       - 'command -v corepack'
   register: corepack_command_check
   environment:
+    HOME: "{{ ansible_user_dir }}"
     PATH: "{{ smoke_managed_node.stdout | trim }}/bin:/usr/bin:/bin"
   changed_when: false
   failed_when: false

@@ -4,6 +4,7 @@ test:
 	./tests/provision_test.sh
 	./tests/preferences_test.sh
 	./tests/javascript_toolchain_test.sh
+	./tests/mise_home_test.sh
 	./tests/ci_test.sh
 	./tests/lima_acceptance_test.sh
 
