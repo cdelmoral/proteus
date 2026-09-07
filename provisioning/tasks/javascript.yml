@@ -34,6 +34,8 @@
       - --global
       - tools.node
   register: selected_node_version
+  environment:
+    HOME: "{{ ansible_user_dir }}"
   changed_when: false
   failed_when: false
 
@@ -44,6 +46,8 @@
       - where
       - "node@{{ node_version }}"
   register: installed_node
+  environment:
+    HOME: "{{ ansible_user_dir }}"
   changed_when: false
   failed_when: false
 
@@ -56,6 +60,7 @@
       - --pin
       - "node@{{ node_version }}"
   environment:
+    HOME: "{{ ansible_user_dir }}"
     MISE_NODE_VERIFY: "true"
     MISE_YES: "1"
   when: >-
@@ -71,6 +76,8 @@
       - where
       - "node@{{ node_version }}"
   register: managed_node
+  environment:
+    HOME: "{{ ansible_user_dir }}"
   changed_when: false
 
 - name: Remove Corepack bundled with Node
