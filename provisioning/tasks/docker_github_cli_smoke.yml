@@ -248,6 +248,7 @@
     argv:
       - gh
       - --version
+  environment: "{{ managed_user_environment }}"
   changed_when: false
   tags:
     - github_cli
