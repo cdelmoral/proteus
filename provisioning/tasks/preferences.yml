@@ -1,0 +1,115 @@
+---
+- name: Load local preferences
+  ansible.builtin.include_vars:
+    file: "{{ local_preferences_file }}"
+    name: local_preferences
+  when: local_preferences_file is defined
+
+- name: Validate the local preferences document
+  ansible.builtin.assert:
+    that:
+      - local_preferences is mapping
+    fail_msg: Local preferences must be a YAML mapping.
+  when: local_preferences_file is defined
+
+- name: Validate local preference fields
+  ansible.builtin.assert:
+    that:
+      - local_preferences.keys() | difference(['git']) | length == 0
+    fail_msg: "Unsupported local preference fields. Allowed fields: git."
+  when: local_preferences_file is defined
+
+- name: Validate Git preferences
+  when:
+    - local_preferences_file is defined
+    - local_preferences.git is defined
+  block:
+    - name: Validate the Git preferences document
+      ansible.builtin.assert:
+        that:
+          - local_preferences.git is mapping
+        fail_msg: Git preferences must be a YAML mapping.
+
+    - name: Validate Git preference fields
+      ansible.builtin.assert:
+        that:
+          - >-
+            local_preferences.git.keys()
+            | difference(['name', 'email'])
+            | length == 0
+        fail_msg: >-
+          Unsupported Git preference fields. Allowed fields: name, email.
+
+    - name: Validate the Git name
+      ansible.builtin.assert:
+        that:
+          - >-
+            local_preferences.git.name is undefined or
+            (local_preferences.git.name is string and
+            (local_preferences.git.name | length) > 0)
+        fail_msg: Git name must be a non-empty string when provided.
+
+    - name: Validate the Git email
+      ansible.builtin.assert:
+        that:
+          - >-
+            local_preferences.git.email is undefined or
+            (local_preferences.git.email is string and
+            (local_preferences.git.email | length) > 0)
+        fail_msg: Git email must be a non-empty string when provided.
+
+    - name: Read the current Git name
+      ansible.builtin.command:
+        argv:
+          - git
+          - config
+          - --global
+          - --get
+          - user.name
+      register: current_git_name
+      changed_when: false
+      failed_when: current_git_name.rc not in [0, 1]
+      no_log: true
+      when: local_preferences.git.name is defined
+
+    - name: Apply the Git name
+      ansible.builtin.command:
+        argv:
+          - git
+          - config
+          - --global
+          - user.name
+          - "{{ local_preferences.git.name }}"
+      changed_when: true
+      no_log: true
+      when:
+        - local_preferences.git.name is defined
+        - current_git_name.stdout != local_preferences.git.name
+
+    - name: Read the current Git email
+      ansible.builtin.command:
+        argv:
+          - git
+          - config
+          - --global
+          - --get
+          - user.email
+      register: current_git_email
+      changed_when: false
+      failed_when: current_git_email.rc not in [0, 1]
+      no_log: true
+      when: local_preferences.git.email is defined
+
+    - name: Apply the Git email
+      ansible.builtin.command:
+        argv:
+          - git
+          - config
+          - --global
+          - user.email
+          - "{{ local_preferences.git.email }}"
+      changed_when: true
+      no_log: true
+      when:
+        - local_preferences.git.email is defined
+        - current_git_email.stdout != local_preferences.git.email

@@ -1,0 +1,61 @@
+---
+- name: Provision Proteus
+  hosts: all
+  gather_facts: false
+
+  pre_tasks:
+    - name: Ensure Python is available for Ansible modules
+      ansible.builtin.raw: |
+        if [ -x /usr/bin/python3 ]; then
+          exit 0
+        fi
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update
+        apt-get install -y python3
+        printf '%s\n' '__PROTEUS_PYTHON_INSTALLED__'
+      become: true
+      register: python_bootstrap
+      changed_when: "'__PROTEUS_PYTHON_INSTALLED__' in python_bootstrap.stdout"
+      tags:
+        - always
+
+    - name: Gather guest facts
+      ansible.builtin.setup:
+      tags:
+        - always
+
+  handlers:
+    - name: Refresh apt metadata after repository changes
+      ansible.builtin.apt:
+        update_cache: true
+      become: true
+      listen: Refresh apt metadata for third-party repositories
+
+  tasks:
+    - name: Apply the system baseline
+      ansible.builtin.import_tasks: tasks/system.yml
+      tags:
+        - system
+
+    - name: Apply local preferences
+      ansible.builtin.import_tasks: tasks/preferences.yml
+      tags:
+        - preferences
+
+    - name: Install the JavaScript development tools
+      ansible.builtin.import_tasks: tasks/javascript.yml
+      tags:
+        - development_tools
+
+    - name: Configure the JavaScript shell environment
+      ansible.builtin.import_tasks: tasks/javascript_shell.yml
+      tags:
+        - shell
+
+    - name: Provision Docker and GitHub CLI
+      ansible.builtin.import_tasks: tasks/docker_github_cli.yml
+
+    - name: Run the complete read-only smoke phase
+      ansible.builtin.import_tasks: tasks/smoke.yml
+      tags:
+        - smoke
