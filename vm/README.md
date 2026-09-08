@@ -2,29 +2,43 @@
 
 Proteus is a persistent Credential-Isolated Dev VM. Its Lima instance is named `proteus`. It runs Ubuntu 26.04 on ARM64 with no host filesystem mounts, imported host SSH public keys, or forwarded host SSH agent.
 
-## Create the VM
+## Operating workflow
 
-Install Lima on the Mac if needed:
+Install Lima and Ansible on the Mac before operating Proteus:
 
 ```bash
-brew install lima
+brew install lima ansible
 ```
 
-Start the VM:
+The Provisioning command checks host prerequisites but never installs or changes macOS software.
+
+### 1. Apply the VM Definition
+
+From the repository root, create and start Proteus from the committed VM Definition:
 
 ```bash
 limactl start --name=proteus ./vm/proteus.yaml
 ```
 
-Install the development tools inside the VM:
+### 2. Run Provisioning
+
+Apply all declared software and non-secret configuration from macOS:
 
 ```bash
-limactl shell proteus < ./vm/bootstrap.sh
+./provision
 ```
 
-The bootstrap is safe to re-run if it stops halfway through.
+Provisioning runs one complete read-only smoke phase after applying the system, development tool, shell, Docker, and GitHub CLI configuration. Run `./provision --upgrade` only when you want safe Ubuntu package upgrades. Managed mise, Node, and pnpm versions remain pinned in either mode.
 
-Enter the VM:
+Private Git preferences may be stored in the ignored `provisioning/local-preferences.yml`; start from `provisioning/local-preferences.example.yml`. Only `git.name` and `git.email` are accepted. If the file or a field is absent, Provisioning leaves that setting alone.
+
+The playbook has `system`, `preferences`, `development_tools`, `shell`, `docker`, `github_cli`, and `smoke` task tags. Normal and upgrade Provisioning apply every concern and finish with all smoke checks. Ansible leaves unmanaged packages, files, and shell content alone.
+
+Provisioning never starts or stops the VM. It reports an error when a host prerequisite is missing, the instance does not exist or is stopped, Lima's generated SSH configuration is unreadable, or the playbook fails.
+
+To test this workflow through a fresh Lima guest without changing the normal `proteus` instance, run `make lima-acceptance` from the repository root. The disposable acceptance instance uses this production VM Definition and the `./provision` command. Its fixed development-port forwards are disabled so `proteus` can remain running. The check runs Provisioning twice, requires zero changes on the second run, and deletes only the temporary `proteus-acceptance-*` instance it created.
+
+### 3. Enter Proteus
 
 ```bash
 limactl shell proteus
@@ -32,7 +46,13 @@ limactl shell proteus
 
 Repos should live inside the VM, under `~/projects`.
 
-## Manual identity setup
+### 4. Perform Credential Enrollment
+
+Complete the following interactive steps inside Proteus. They create VM-Local Credentials and never copy or forward credentials from macOS.
+
+This cutover supports fresh VMs only. Recreate a VM configured by the old shell bootstrap. Provisioning does not migrate or adopt its state.
+
+## Credential Enrollment
 
 Do not copy SSH keys, GitHub tokens, AWS files, or cloud credentials from the Mac.
 
@@ -48,18 +68,18 @@ Add the public key to GitHub, then authenticate GitHub CLI inside the VM:
 gh auth login
 ```
 
-Configure Git identity manually inside the VM:
+Configure Git identity manually inside the VM if private local preferences do not provide it:
 
 ```bash
 git config --global user.name "Your Name"
 git config --global user.email "you@example.com"
 ```
 
-The bootstrap does not configure AWS access. When access becomes necessary, enroll AWS SSO inside the VM instead of copying host credentials.
+AWS SSO remains future interactive Credential Enrollment. When access becomes necessary, enroll inside the VM instead of copying host credentials.
 
 ## Docker risk
 
-The bootstrap adds the VM user to the `docker` group. That makes `docker` usable without `sudo`, but the `docker` group is effectively root inside the VM.
+Provisioning adds the VM user to the `docker` group. That makes `docker` usable without `sudo`, but the `docker` group is effectively root inside the VM.
 
 This is acceptable because Proteus is a single-user VM and does not assume a Production AWS Role. Revisit this choice if the VM becomes multi-user, stores sensitive data, or needs a Production AWS Role.
 

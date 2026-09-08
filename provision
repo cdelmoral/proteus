@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly instance="${PROTEUS_INSTANCE:-proteus}"
+script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+readonly script_dir
+readonly playbook="${script_dir}/provisioning/playbook.yml"
+readonly local_preferences_file="${script_dir}/provisioning/local-preferences.yml"
+
+usage() {
+  printf 'Usage: %s [--upgrade]\n' "${0##*/}" >&2
+  printf 'Safe Ubuntu package upgrades are opt-in; managed tool versions remain pinned.\n' >&2
+}
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\r'/\\r}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "$value"
+}
+
+case "$#" in
+  0)
+    readonly proteus_upgrade=false
+    ;;
+  1)
+    if [[ "$1" != "--upgrade" ]]; then
+      usage
+      exit 2
+    fi
+    readonly proteus_upgrade=true
+    ;;
+  *)
+    usage
+    exit 2
+    ;;
+esac
+
+if ! command -v ansible-playbook >/dev/null 2>&1; then
+  printf 'ansible-playbook is required. Install it with: brew install ansible\n' >&2
+  exit 1
+fi
+
+if ! command -v limactl >/dev/null 2>&1; then
+  printf 'limactl is required. Install it with: brew install lima\n' >&2
+  exit 1
+fi
+
+if ! instance_info="$(limactl list --tty=false --format='{{.Status}}|{{.Hostname}}|{{.SSHConfigFile}}' "$instance" 2>/dev/null)" ||
+  [[ -z "$instance_info" ]]; then
+  printf "Lima instance '%s' does not exist.\n" "$instance" >&2
+  exit 1
+fi
+
+IFS='|' read -r status hostname ssh_config <<<"$instance_info"
+
+if [[ "$status" != "Running" ]]; then
+  printf "Lima instance '%s' is not running (status: %s).\n" "$instance" "${status:-unknown}" >&2
+  exit 1
+fi
+
+if [[ -z "$hostname" ]]; then
+  printf "Lima did not report an SSH hostname for instance '%s'.\n" "$instance" >&2
+  exit 1
+fi
+
+if [[ -z "$ssh_config" || ! -f "$ssh_config" || ! -r "$ssh_config" ]]; then
+  printf "Lima SSH configuration is not readable: %s\n" "${ssh_config:-<empty>}" >&2
+  exit 1
+fi
+
+ansible_arguments=(
+  --inventory
+  "${hostname},"
+  "--ssh-common-args=-F ${ssh_config}"
+  --extra-vars
+  "{\"proteus_upgrade\":${proteus_upgrade}}"
+)
+if [[ -f "$local_preferences_file" ]]; then
+  ansible_arguments+=(
+    --extra-vars
+    "{\"local_preferences_file\":\"$(json_escape "$local_preferences_file")\"}"
+  )
+fi
+
+exec ansible-playbook "${ansible_arguments[@]}" "$playbook"

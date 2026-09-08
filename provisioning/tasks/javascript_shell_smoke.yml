@@ -1,0 +1,71 @@
+---
+- name: Count the JavaScript shell block markers
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/grep
+      - -Fxc
+      - "# BEGIN ANSIBLE MANAGED BLOCK: Proteus JavaScript toolchain"
+      - "{{ ansible_user_dir }}/.bashrc"
+  register: javascript_shell_marker_count
+  changed_when: false
+  failed_when: false
+
+- name: Verify one JavaScript shell block
+  ansible.builtin.assert:
+    that:
+      - javascript_shell_marker_count.rc == 0
+      - javascript_shell_marker_count.stdout | trim == "1"
+    fail_msg: >-
+      The Bash configuration must contain one JavaScript toolchain block.
+
+- name: Exercise the managed JavaScript shell environment
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/bash
+      - --noprofile
+      - --norc
+      - -c
+      - |
+        set -eu
+        export PATH=/usr/bin:/bin
+        begin_marker='# BEGIN ANSIBLE MANAGED BLOCK: Proteus JavaScript toolchain'
+        end_marker='# END ANSIBLE MANAGED BLOCK: Proteus JavaScript toolchain'
+        source <(
+          /usr/bin/sed -n "/^${begin_marker}$/,/^${end_marker}$/p" "$1"
+        )
+        printf '%s|%s\n' "$(node --version)" "$(pnpm --version)" &&
+        test "$PNPM_HOME" = "$HOME/.local/share/proteus/pnpm/{{ pnpm_version }}" &&
+        command -v mise >/dev/null &&
+        ! command -v corepack >/dev/null
+      - --
+      - "{{ ansible_user_dir }}/.bashrc"
+  register: javascript_shell_check
+  environment: "{{ managed_user_environment }}"
+  changed_when: false
+
+- name: Verify the managed JavaScript shell environment
+  ansible.builtin.assert:
+    that:
+      - >-
+        "v" ~ node_version ~ "|" ~ pnpm_version
+        in javascript_shell_check.stdout_lines
+    fail_msg: The managed Bash environment did not select the pinned tools.
+
+- name: Inspect Bash configuration ownership
+  ansible.builtin.stat:
+    path: "{{ ansible_user_dir }}/.bashrc"
+  register: bash_configuration
+
+- name: Verify Bash configuration ownership
+  ansible.builtin.assert:
+    that:
+      - bash_configuration.stat.pw_name == ansible_user_id
+    fail_msg: The Bash configuration must belong to {{ ansible_user_id }}.
+
+- name: Validate the managed Bash configuration
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/bash
+      - -n
+      - "{{ ansible_user_dir }}/.bashrc"
+  changed_when: false

@@ -1,0 +1,11 @@
+---
+- name: Test local preferences
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+
+  tasks:
+    - name: Apply local preferences under test
+      ansible.builtin.import_tasks: ../provisioning/tasks/preferences.yml
