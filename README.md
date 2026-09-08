@@ -1,44 +1,95 @@
 # Proteus
 
-Proteus is a persistent, general-purpose Linux development VM for macOS. It runs on [Lima](https://lima-vm.io/) and keeps development credentials separate from the host.
+Proteus is a persistent, general-purpose Credential-Isolated Dev VM for macOS. It runs on [Lima](https://lima-vm.io/) and keeps development credentials separate from the host.
 
-Projects, tools, and credentials live on the VM disk. Proteus does not mount host directories, import host SSH public keys, or forward the host SSH agent. Create GitHub and cloud credentials inside the VM instead of copying them from macOS.
+Projects, tools, and VM-Local Credentials live on the VM disk. Proteus does not mount host directories, import host SSH public keys, or forward the host SSH agent. Create GitHub and cloud credentials inside the VM instead of copying them from macOS.
 
 ## Requirements
 
 - An Apple silicon Mac
 - [Homebrew](https://brew.sh/)
-- Lima
+- Lima 2.2 or later
+- Ansible
 
-Install Lima if needed:
+Install the host tools before creating Proteus:
 
 ```bash
-brew install lima
+brew install lima ansible
 ```
 
-## Start Proteus
+The Provisioning command checks these prerequisites but does not install or change software on macOS.
 
-Create and start the VM from the repository root:
+## Operating workflow
+
+Run these steps from the repository root.
+
+### 1. Apply the VM Definition
+
+Create and start the VM from the committed VM Definition:
 
 ```bash
 limactl start --name=proteus ./vm/proteus.yaml
 ```
 
-Install the development tools:
+### 2. Run Provisioning
+
+Apply all declared software and non-secret configuration:
 
 ```bash
-limactl shell proteus < ./vm/bootstrap.sh
+./provision
 ```
 
-Enter the VM:
+Provisioning ends with one read-only smoke phase that checks every baseline component.
+
+### 3. Enter Proteus
 
 ```bash
 limactl shell proteus
 ```
 
-Clone repositories under `~/projects`. Credentials created inside Proteus persist with the VM disk.
+Clone repositories under `~/projects`.
 
-See [`vm/README.md`](./vm/README.md) for identity setup, Docker security, and port forwarding.
+### 4. Perform Credential Enrollment
+
+Create the SSH key and GitHub authentication inside Proteus. Configure Git identity there too unless you use private local preferences. See [`vm/README.md`](./vm/README.md) for the commands and the future AWS SSO enrollment policy.
+
+The Ansible cutover supports fresh VMs. Recreate a VM configured by the old shell bootstrap before using this workflow. Provisioning does not migrate or adopt bootstrap-created state.
+
+## Provisioning behavior
+
+Routine Provisioning reconciles the checked-in package and tool versions without requesting an Ubuntu package upgrade:
+
+```bash
+./provision
+```
+
+Request safe Ubuntu package upgrades explicitly:
+
+```bash
+./provision --upgrade
+```
+
+Upgrade mode does not discover new mise, Node, or pnpm releases. Change their checked-in versions before Provisioning can install a newer release. Both modes preserve unmanaged packages, files, and shell content, and both run the complete smoke phase. A second complete run should report `changed=0`, `unreachable=0`, and `failed=0`.
+
+To apply private Git preferences, copy `provisioning/local-preferences.example.yml` to the ignored `provisioning/local-preferences.yml` and edit the copy. The file accepts only `git.name` and `git.email`; it is not a place for credentials or arbitrary Ansible variables. Missing values leave the matching guest settings unchanged.
+
+The playbook records these maintenance tags: `system`, `preferences`, `development_tools`, `shell`, `docker`, `github_cli`, and `smoke`. The `./provision` command deliberately does not expose arbitrary Ansible arguments. Normal and upgrade runs apply every concern before the final smoke phase.
+
+Provisioning fails without changing VM power state when Ansible or Lima is missing, the `proteus` instance does not exist or is stopped, Lima's generated SSH configuration is unreadable, or Ansible reports a failure.
+
+## Disposable Lima acceptance
+
+Run the full macOS-to-guest acceptance check on an Apple silicon Mac with Lima and Ansible installed:
+
+```bash
+make lima-acceptance
+```
+
+The check validates the production VM Definition, creates a uniquely named `proteus-acceptance-*` instance from it, and disables only that instance's development-port forwards. The normal `proteus` instance may keep running because the disposable VM does not claim ports 3000, 5173, 8000, or 8080.
+
+The check calls `./provision` twice against the disposable instance. The first run includes the complete production smoke phase. The second run must report `changed=0`, `unreachable=0`, and `failed=0`. An exit trap deletes the exact instance created by the check, including when Provisioning or the convergence assertion fails. It refuses to use an existing name and cannot target the normal `proteus` instance.
+
+See [`vm/README.md`](./vm/README.md) for Credential Enrollment, Docker security, and port forwarding.
 
 ## Isolation boundary
 

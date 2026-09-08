@@ -1,0 +1,86 @@
+---
+proteus_upgrade: false
+
+managed_user_environment:
+  HOME: "{{ ansible_user_dir }}"
+  XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"
+
+baseline_system_packages:
+  - build-essential
+  - ca-certificates
+  - curl
+  - fzf
+  - git
+  - gnupg
+  - jq
+  - neovim
+  - pipx
+  - python3
+  - python3-venv
+  - ripgrep
+  - unzip
+  - wget
+
+baseline_commands:
+  - curl
+  - fzf
+  - git
+  - gpg
+  - jq
+  - make
+  - nvim
+  - pipx
+  - python3
+  - rg
+  - unzip
+  - wget
+
+mise_version: "2026.9.1"
+mise_download_url: >-
+  https://github.com/jdx/mise/releases/download/v2026.9.1/mise-v2026.9.1-linux-arm64
+mise_checksum: >-
+  sha256:0ef0a778eaa8599f3e90a8a0979c9fc3f79922cafb5fa6d39f366d974da33bba
+mise_install_dir: >-
+  {{ ansible_user_dir }}/.local/share/proteus/mise/{{ mise_version }}
+mise_binary: "{{ mise_install_dir }}/mise"
+
+node_version: "24.20.0"
+
+pnpm_version: "12.3.4"
+pnpm_download_url: >-
+  https://github.com/pnpm/pnpm/releases/download/v12.3.4/pnpm-linux-arm64.tar.gz
+pnpm_checksum: >-
+  sha256:95e71a2a30bbc0b77511f95cf096779068dcad6ffcbbfdf0cd4dde9de2b2b97c
+pnpm_archive: >-
+  {{ ansible_user_dir }}/.cache/proteus/pnpm-{{ pnpm_version }}.tar.gz
+pnpm_install_dir: >-
+  {{ ansible_user_dir }}/.local/share/proteus/pnpm/{{ pnpm_version }}
+
+docker_packages:
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-ce
+  - docker-ce-cli
+  - docker-compose-plugin
+docker_repository_key_url: https://download.docker.com/linux/ubuntu/gpg
+docker_repository_key_checksum: >-
+  sha256:1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570
+docker_repository_key_path: /etc/apt/keyrings/docker.asc
+docker_repository_source_path: /etc/apt/sources.list.d/docker.sources
+docker_repository_uri: https://download.docker.com/linux/ubuntu
+docker_repository_suite: resolute
+docker_repository_component: stable
+docker_repository_architecture: arm64
+
+github_cli_packages:
+  - gh
+github_cli_repository_key_url: >-
+  https://cli.github.com/packages/githubcli-archive-keyring.gpg
+github_cli_repository_key_checksum: >-
+  sha256:6084d5d7bd8e288441e0e94fc6275570895da18e6751f70f057485dc2d1a811b
+github_cli_repository_key_path: /etc/apt/keyrings/githubcli-archive-keyring.gpg
+github_cli_repository_source_path: /etc/apt/sources.list.d/github-cli.sources
+github_cli_repository_uri: https://cli.github.com/packages
+github_cli_repository_suite: stable
+github_cli_repository_component: main
+github_cli_repository_architecture: arm64
