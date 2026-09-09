@@ -1,0 +1,88 @@
+---
+- name: Check headless Neovim startup and Diffview
+  ansible.builtin.command:
+    argv:
+      - nvim
+      - --headless
+      - -i
+      - NONE
+      - >-
+        +lua local fs = vim.uv or vim.loop; for name,plugin in
+        pairs(require('lazy.core.config').plugins) do
+        assert(fs.fs_stat(plugin.dir), 'missing plugin: ' .. name) end;
+        assert(vim.fn.exists(':DiffviewOpen') == 2);
+        for _,name in ipairs({'opencode.nvim','nvim-jdtls','vim-cooklang',
+        'zk-nvim','kanagawa.nvim'}) do
+        assert(require('lazy.core.config').plugins[name] == nil) end
+      - +qa
+  environment: >-
+    {{ managed_development_environment | combine({"PROTEUS_SMOKE": "1"}) }}
+  register: neovim_startup_check
+  changed_when: false
+
+- name: Check representative editor tools
+  ansible.builtin.stat:
+    path: "{{ ansible_user_dir }}/.local/share/nvim/mason/bin/{{ item }}"
+  loop: "{{ neovim_tools }}"
+  register: neovim_tool_checks
+
+- name: Check declared Treesitter parsers
+  ansible.builtin.command:
+    argv:
+      - nvim
+      - --headless
+      - -i
+      - NONE
+      - >-
+        +lua for _,lang in ipairs({{ neovim_parsers | to_json }}) do
+        assert(pcall(vim.treesitter.language.add, lang)) end
+      - +qa
+  environment: >-
+    {{ managed_development_environment | combine({"PROTEUS_SMOKE": "1"}) }}
+  register: neovim_parser_checks
+  changed_when: false
+
+- name: Check excluded Neovim configuration paths
+  ansible.builtin.stat:
+    path: "{{ neovim_config_dir }}/lua/plugins/{{ item }}.lua"
+  loop:
+    - apex
+    - cooklang
+    - opencode
+    - tmux
+    - zk
+  register: neovim_excluded_paths
+
+- name: Read the selected LazyVim extras
+  ansible.builtin.slurp:
+    src: "{{ neovim_config_dir }}/lazyvim.json"
+  register: neovim_extras
+
+- name: Find files not owned by the guest in Neovim state
+  ansible.builtin.command:
+    argv:
+      - find
+      - "{{ item }}"
+      - "!"
+      - -user
+      - "{{ ansible_user_id }}"
+      - -print
+      - -quit
+  loop:
+    - "{{ neovim_config_dir }}"
+    - "{{ ansible_user_dir }}/.local/share/nvim"
+  register: neovim_ownership_checks
+  changed_when: false
+
+- name: Verify the Neovim profile
+  ansible.builtin.assert:
+    that:
+      - neovim_startup_check.rc == 0
+      - neovim_tool_checks.results | map(attribute='stat.exists') | min
+      - neovim_parser_checks.rc == 0
+      - not (neovim_excluded_paths.results | map(attribute='stat.exists') | max)
+      - "'lang.astro' not in (neovim_extras.content | b64decode)"
+      - "'lang.go' not in (neovim_extras.content | b64decode)"
+      - "'lang.java' not in (neovim_extras.content | b64decode)"
+      - "'lang.tailwind' not in (neovim_extras.content | b64decode)"
+      - neovim_ownership_checks.results | map(attribute='stdout') | join('') == ''

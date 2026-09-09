@@ -63,7 +63,8 @@
         argv:
           - git
           - config
-          - --global
+          - --file
+          - "{{ git_local_config_path }}"
           - --get
           - user.name
       register: current_git_name
@@ -77,7 +78,8 @@
         argv:
           - git
           - config
-          - --global
+          - --file
+          - "{{ git_local_config_path }}"
           - user.name
           - "{{ local_preferences.git.name }}"
       changed_when: true
@@ -91,7 +93,8 @@
         argv:
           - git
           - config
-          - --global
+          - --file
+          - "{{ git_local_config_path }}"
           - --get
           - user.email
       register: current_git_email
@@ -105,7 +108,8 @@
         argv:
           - git
           - config
-          - --global
+          - --file
+          - "{{ git_local_config_path }}"
           - user.email
           - "{{ local_preferences.git.email }}"
       changed_when: true
@@ -113,3 +117,14 @@
       when:
         - local_preferences.git.email is defined
         - current_git_email.stdout != local_preferences.git.email
+
+    - name: Protect the local Git identity file
+      ansible.builtin.file:
+        path: "{{ git_local_config_path }}"
+        state: file
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_gid }}"
+        mode: "0600"
+      when: >-
+        local_preferences.git.name is defined or
+        local_preferences.git.email is defined

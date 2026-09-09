@@ -1,0 +1,108 @@
+---
+- name: Check OpenCode ownership marker
+  ansible.builtin.stat:
+    path: "{{ managed_paths_state_dir }}/opencode"
+  register: opencode_marker
+
+- name: Check OpenCode managed paths before first adoption
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ opencode_install_dir }}"
+    - "{{ ansible_user_dir }}/.local/bin/opencode"
+    - "{{ opencode_config_dir }}/opencode.json"
+    - "{{ opencode_config_dir }}/tui.json"
+    - "{{ opencode_config_dir }}/AGENTS.md"
+    - "{{ opencode_config_dir }}/skills/unslop/SKILL.md"
+  register: opencode_paths_before_adoption
+  when: not opencode_marker.stat.exists
+
+- name: Refuse unmanaged OpenCode paths
+  ansible.builtin.assert:
+    that: not item.stat.exists
+    fail_msg: "Refusing to replace unmanaged path {{ item.item }}."
+  loop: "{{ opencode_paths_before_adoption.results }}"
+  when:
+    - not opencode_marker.stat.exists
+    - item.stat is defined
+
+- name: Create OpenCode directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_gid }}"
+    mode: "0755"
+  loop:
+    - "{{ ansible_user_dir }}/.cache/proteus"
+    - "{{ ansible_user_dir }}/.local/bin"
+    - "{{ ansible_user_dir }}/.local/share/proteus/opencode"
+    - "{{ opencode_config_dir }}"
+    - "{{ opencode_config_dir }}/skills"
+    - "{{ opencode_config_dir }}/skills/unslop"
+    - "{{ managed_paths_state_dir }}"
+
+- name: Record OpenCode path ownership
+  ansible.builtin.copy:
+    content: "Proteus manages the declared OpenCode command and configuration.\n"
+    dest: "{{ managed_paths_state_dir }}/opencode"
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_gid }}"
+    mode: "0644"
+
+- name: Download the pinned OpenCode release
+  ansible.builtin.get_url:
+    url: "{{ opencode_download_url }}"
+    dest: "{{ opencode_archive }}"
+    checksum: "{{ opencode_checksum }}"
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_gid }}"
+    mode: "0644"
+
+- name: Check the pinned OpenCode installation
+  ansible.builtin.stat:
+    path: "{{ opencode_binary }}"
+  register: opencode_installed_binary
+
+- name: Create the pinned OpenCode installation directory
+  ansible.builtin.file:
+    path: "{{ opencode_install_dir }}"
+    state: directory
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_gid }}"
+    mode: "0755"
+  when: not opencode_installed_binary.stat.exists
+
+- name: Extract the pinned OpenCode release
+  ansible.builtin.unarchive:
+    src: "{{ opencode_archive }}"
+    dest: "{{ opencode_install_dir }}"
+    remote_src: true
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_gid }}"
+  when: not opencode_installed_binary.stat.exists
+
+- name: Link the pinned OpenCode command
+  ansible.builtin.file:
+    src: "{{ opencode_binary }}"
+    dest: "{{ ansible_user_dir }}/.local/bin/opencode"
+    state: link
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_gid }}"
+
+- name: Install OpenCode configuration
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_gid }}"
+    mode: "0644"
+  loop:
+    - src: files/opencode/opencode.json
+      dest: "{{ opencode_config_dir }}/opencode.json"
+    - src: files/opencode/tui.json
+      dest: "{{ opencode_config_dir }}/tui.json"
+    - src: files/opencode/AGENTS.md
+      dest: "{{ opencode_config_dir }}/AGENTS.md"
+    - src: files/opencode/skills/unslop/SKILL.md
+      dest: "{{ opencode_config_dir }}/skills/unslop/SKILL.md"
