@@ -3,6 +3,8 @@
 test:
 	./tests/provision_test.sh
 	./tests/preferences_test.sh
+	./tests/workstation_tools_test.sh
+	./tests/managed_path_conflict_test.sh
 	./tests/javascript_toolchain_test.sh
 	./tests/mise_home_test.sh
 	./tests/ci_test.sh
@@ -11,7 +13,7 @@ test:
 static:
 	ansible-playbook --syntax-check --inventory localhost, provisioning/playbook.yml
 	ansible-lint --profile safety provisioning
-	yamllint .github provisioning vm tests/preferences_test.yml
+	yamllint .github provisioning vm tests/preferences_test.yml tests/managed_path_conflict_test.yml
 	bash -n provision tests/*.sh
 	shellcheck provision tests/*.sh
 	actionlint -ignore 'label "ubuntu-26.04-arm" is unknown'

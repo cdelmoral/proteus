@@ -1,0 +1,26 @@
+---
+- name: Test managed-path conflict refusal
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../provisioning/group_vars/all.yml
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+    ansible_user_id: "{{ lookup('env', 'USER') }}"
+    ansible_user_gid: "{{ lookup('pipe', 'id -gn') }}"
+    ansible_env:
+      PATH: "{{ lookup('env', 'PATH') }}"
+
+  tasks:
+    - name: Include prompt tasks under test
+      ansible.builtin.import_tasks: ../provisioning/tasks/prompt.yml
+
+    - name: Include OpenCode tasks under test
+      ansible.builtin.import_tasks: ../provisioning/tasks/opencode.yml
+
+    - name: Include Neovim tasks under test
+      ansible.builtin.import_tasks: ../provisioning/tasks/neovim.yml
+
+    - name: Include Git tasks under test
+      ansible.builtin.import_tasks: ../provisioning/tasks/git.yml

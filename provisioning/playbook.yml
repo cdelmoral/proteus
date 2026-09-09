@@ -37,11 +37,6 @@
       tags:
         - system
 
-    - name: Apply local preferences
-      ansible.builtin.import_tasks: tasks/preferences.yml
-      tags:
-        - preferences
-
     - name: Install the JavaScript development tools
       ansible.builtin.import_tasks: tasks/javascript.yml
       tags:
@@ -51,6 +46,31 @@
       ansible.builtin.import_tasks: tasks/javascript_shell.yml
       tags:
         - shell
+
+    - name: Configure the Bash prompt
+      ansible.builtin.import_tasks: tasks/prompt.yml
+      tags:
+        - shell
+
+    - name: Provision OpenCode
+      ansible.builtin.import_tasks: tasks/opencode.yml
+      tags:
+        - development_tools
+
+    - name: Provision the Neovim profile
+      ansible.builtin.import_tasks: tasks/neovim.yml
+      tags:
+        - development_tools
+
+    - name: Provision the Git workflow
+      ansible.builtin.import_tasks: tasks/git.yml
+      tags:
+        - development_tools
+
+    - name: Apply local preferences
+      ansible.builtin.import_tasks: tasks/preferences.yml
+      tags:
+        - preferences
 
     - name: Provision Docker and GitHub CLI
       ansible.builtin.import_tasks: tasks/docker_github_cli.yml

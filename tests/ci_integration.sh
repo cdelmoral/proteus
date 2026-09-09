@@ -12,6 +12,9 @@ readonly sudoers_file="${work_directory}/sudoers"
 readonly playbook="${repository_root}/provisioning/playbook.yml"
 readonly project_version_test="${repository_root}/tests/pnpm_project_version.sh"
 readonly unmanaged_shell_sentinel=".proteus-smoke-ran-unmanaged-shell"
+readonly unmanaged_opencode_file=".config/opencode/unmanaged-note"
+readonly unmanaged_nvim_file=".config/nvim/unmanaged.lua"
+readonly opencode_auth_file=".local/share/opencode/auth.json"
 readonly -a ssh_options=(
   -o BatchMode=yes
   -o StrictHostKeyChecking=no
@@ -76,6 +79,12 @@ if [[ "$ssh_ready" != true ]]; then
   exit 1
 fi
 
+ssh "${ssh_options[@]}" -i "$private_key" "$ci_user@127.0.0.1" \
+  "mkdir -p \"\$HOME/.config/opencode\" \"\$HOME/.config/nvim\" \"\$HOME/.local/share/opencode\" &&
+  printf '%s\n' 'preserve OpenCode sibling' >\"\$HOME/$unmanaged_opencode_file\" &&
+  printf '%s\n' 'return {}' >\"\$HOME/$unmanaged_nvim_file\" &&
+  printf '%s\n' '{\"test-provider\":\"preserve-auth-state\"}' >\"\$HOME/$opencode_auth_file\""
+
 ANSIBLE_FORCE_COLOR=0 ansible-playbook "${playbook_arguments[@]}"
 ssh "${ssh_options[@]}" -i "$private_key" "$ci_user@127.0.0.1" \
   /usr/bin/bash -s <"$project_version_test"
@@ -86,4 +95,7 @@ ANSIBLE_FORCE_COLOR=0 ansible-playbook "${playbook_arguments[@]}" | tee "$second
 ssh "${ssh_options[@]}" -i "$private_key" "$ci_user@127.0.0.1" \
   "grep -Fqx 'touch \"\$HOME/$unmanaged_shell_sentinel\"' \"\$HOME/.bashrc\" &&
   test ! -e \"\$HOME/$unmanaged_shell_sentinel\" &&
+  grep -Fqx 'preserve OpenCode sibling' \"\$HOME/$unmanaged_opencode_file\" &&
+  grep -Fqx 'return {}' \"\$HOME/$unmanaged_nvim_file\" &&
+  grep -Fqx '{\"test-provider\":\"preserve-auth-state\"}' \"\$HOME/$opencode_auth_file\" &&
   test -e /usr/local/bin/corepack"

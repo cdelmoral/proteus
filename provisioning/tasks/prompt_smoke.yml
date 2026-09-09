@@ -1,0 +1,38 @@
+---
+- name: Check the Starship command
+  ansible.builtin.command:
+    argv:
+      - starship
+      - --version
+  register: starship_version_check
+  changed_when: false
+
+- name: Read the managed Starship configuration
+  ansible.builtin.slurp:
+    src: "{{ starship_config_path }}"
+  register: starship_config_check
+
+- name: Read the Bash configuration for prompt checks
+  ansible.builtin.slurp:
+    src: "{{ ansible_user_dir }}/.bashrc"
+  register: prompt_bashrc_check
+
+- name: Verify the managed Bash prompt
+  ansible.builtin.assert:
+    that:
+      - starship_version_check.rc == 0
+      - >-
+        (starship_config_check.content | b64decode)
+        is search('\\$directory\\$git_branch\\$git_status\\$cmd_duration')
+      - >-
+        (starship_config_check.content | b64decode)
+        is search('\\$status\\$character')
+      - "'$nodejs' not in (starship_config_check.content | b64decode)"
+      - "'$aws' not in (starship_config_check.content | b64decode)"
+      - >-
+        (prompt_bashrc_check.content | b64decode)
+        is search('eval "\\$\\(starship init bash\\)"')
+      - >-
+        (prompt_bashrc_check.content | b64decode)
+        | regex_findall('BEGIN ANSIBLE MANAGED BLOCK: Proteus Starship prompt')
+        | length == 1

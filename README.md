@@ -73,7 +73,7 @@ Upgrade mode does not discover new mise, Node, or pnpm releases. Change their ch
 
 To apply private Git preferences, copy `provisioning/local-preferences.example.yml` to the ignored `provisioning/local-preferences.yml` and edit the copy. The file accepts only `git.name` and `git.email`; it is not a place for credentials or arbitrary Ansible variables. Missing values leave the matching guest settings unchanged.
 
-The playbook records these maintenance tags: `system`, `preferences`, `development_tools`, `shell`, `docker`, `github_cli`, and `smoke`. The `./provision` command deliberately does not expose arbitrary Ansible arguments. Normal and upgrade runs apply every concern before the final smoke phase.
+The playbook records these maintenance tags: `system`, `preferences`, `development_tools`, `shell`, `docker`, `github_cli`, and `smoke`. The `development_tools` work includes OpenCode, the LazyVim profile, and Git tooling. The `shell` work includes the Bash-native Starship prompt. The `./provision` command deliberately does not expose arbitrary Ansible arguments. Normal and upgrade runs apply every concern before the final smoke phase.
 
 Provisioning fails without changing VM power state when Ansible or Lima is missing, the `proteus` instance does not exist or is stopped, Lima's generated SSH configuration is unreadable, or Ansible reports a failure.
 
