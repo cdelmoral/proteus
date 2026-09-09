@@ -5,6 +5,9 @@
   gather_facts: false
   vars:
     ansible_python_interpreter: "{{ ansible_playbook_python }}"
+    ansible_user_id: "{{ lookup('env', 'USER') }}"
+    ansible_user_gid: "{{ lookup('pipe', 'id -gn') }}"
+    git_local_config_path: "{{ lookup('env', 'GIT_CONFIG_GLOBAL') }}"
 
   tasks:
     - name: Apply local preferences under test

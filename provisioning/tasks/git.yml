@@ -1,0 +1,67 @@
+---
+- name: Install the Git workflow
+  ansible.builtin.apt:
+    name: "{{ git_workflow_packages }}"
+    state: present
+  become: true
+
+- name: Check Git ownership marker
+  ansible.builtin.stat:
+    path: "{{ managed_paths_state_dir }}/git"
+  register: git_marker
+
+- name: Check the main Git configuration before first adoption
+  ansible.builtin.stat:
+    path: "{{ git_config_path }}"
+  register: git_config_before_adoption
+  when: not git_marker.stat.exists
+
+- name: Refuse an unmanaged Git configuration
+  ansible.builtin.assert:
+    that: not git_config_before_adoption.stat.exists
+    fail_msg: "Refusing to replace unmanaged file {{ git_config_path }}."
+  when: not git_marker.stat.exists
+
+- name: Check the global Git ignore file before first adoption
+  ansible.builtin.stat:
+    path: "{{ git_ignore_path }}"
+  register: git_ignore_before_adoption
+  when: not git_marker.stat.exists
+
+- name: Refuse an unmanaged global Git ignore file
+  ansible.builtin.assert:
+    that: not git_ignore_before_adoption.stat.exists
+    fail_msg: "Refusing to replace unmanaged file {{ git_ignore_path }}."
+  when: not git_marker.stat.exists
+
+- name: Create the managed-path state directory for Git
+  ansible.builtin.file:
+    path: "{{ managed_paths_state_dir }}"
+    state: directory
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_gid }}"
+    mode: "0755"
+
+- name: Record Git configuration ownership
+  ansible.builtin.copy:
+    content: "Proteus manages the main Git configuration and global ignore file.\n"
+    dest: "{{ managed_paths_state_dir }}/git"
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_gid }}"
+    mode: "0644"
+
+- name: Install the main Git configuration
+  ansible.builtin.copy:
+    src: files/git/gitconfig
+    dest: "{{ git_config_path }}"
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_gid }}"
+    mode: "0644"
+
+- name: Install the global Git ignore file
+  ansible.builtin.copy:
+    src: files/git/gitignore_global
+    dest: "{{ git_ignore_path }}"
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_gid }}"
+    mode: "0644"

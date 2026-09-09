@@ -1,0 +1,24 @@
+[core]
+	pager = delta
+	excludesFile = ~/.gitignore_global
+	commentChar = ;
+[interactive]
+	diffFilter = delta --color-only
+[delta]
+	navigate = true
+	line-numbers = true
+[diff]
+	tool = nvimdiff
+	ignoreWhitespace = true
+[merge]
+	tool = diffview
+	conflictStyle = zdiff3
+[mergetool]
+	keepBackup = false
+	prompt = false
+[mergetool "diffview"]
+	cmd = nvim -c \"DiffviewOpen\"
+[alias]
+	lg = log --oneline --graph --decorate --all
+[include]
+	path = ~/.gitconfig.local
