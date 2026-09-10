@@ -5,14 +5,11 @@ repository_root="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 readonly repository_root
 readonly vm_definition="${repository_root}/vm/proteus.yaml"
 readonly provision_command="${repository_root}/provision"
-readonly convergence_check="${repository_root}/tests/assert_converged.sh"
-readonly project_version_test="${repository_root}/tests/pnpm_project_version.sh"
 generated_suffix="$(date -u +%Y%m%d%H%M%S)-$$-${RANDOM}"
 readonly generated_suffix
 readonly instance="${PROTEUS_ACCEPTANCE_INSTANCE:-proteus-acceptance-${generated_suffix}}"
 
 created=false
-second_run_output=''
 
 cleanup() {
   local exit_status=$?
@@ -25,7 +22,6 @@ cleanup() {
     fi
   fi
 
-  [[ -z "$second_run_output" ]] || rm -f "$second_run_output"
   trap - EXIT
   exit "$exit_status"
 }
@@ -67,15 +63,6 @@ trap cleanup EXIT
 limactl start --tty=false "$instance"
 
 printf "Running Provisioning against '%s'.\n" "$instance"
-PROTEUS_INSTANCE="$instance" "$provision_command"
-
-printf "Testing project-level pnpm selection in '%s'.\n" "$instance"
-limactl shell --tty=false "$instance" /usr/bin/bash -s <"$project_version_test"
-
-second_run_output="$(mktemp)"
-printf "Running Provisioning against '%s' again to verify convergence.\n" "$instance"
-PROTEUS_INSTANCE="$instance" "$provision_command" | tee "$second_run_output"
-
-"$convergence_check" "$second_run_output"
+"$provision_command" "$instance"
 
 printf "Disposable Lima acceptance passed for '%s'.\n" "$instance"

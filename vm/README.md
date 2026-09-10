@@ -28,15 +28,15 @@ Apply all declared software and non-secret configuration from macOS:
 ./provision
 ```
 
-Provisioning runs one complete read-only smoke phase after applying the system, development tool, shell, Docker, and GitHub CLI configuration. Run `./provision --upgrade` only when you want safe Ubuntu package upgrades. Managed mise, Node, and pnpm versions remain pinned in either mode.
+Provisioning runs one complete read-only smoke phase after applying the system, development tool, shell, Docker, and GitHub CLI configuration. Pass an instance name to target a running instance other than `proteus`, for example `./provision proteus-acceptance-example`.
 
 Private Git preferences may be stored in the ignored `provisioning/local-preferences.yml`; start from `provisioning/local-preferences.example.yml`. Only `git.name` and `git.email` are accepted. If the file or a field is absent, Provisioning leaves that setting alone.
 
-The playbook has `system`, `preferences`, `development_tools`, `shell`, `docker`, `github_cli`, and `smoke` task tags. Normal and upgrade Provisioning apply every concern and finish with all smoke checks. Ansible leaves unmanaged packages, files, and shell content alone.
+The playbook has `system`, `preferences`, `development_tools`, `shell`, `docker`, `github_cli`, and `smoke` task tags. Provisioning applies every concern and finishes with all smoke checks. Ansible leaves unmanaged packages, files, and shell content alone.
 
 Provisioning never starts or stops the VM. It reports an error when a host prerequisite is missing, the instance does not exist or is stopped, Lima's generated SSH configuration is unreadable, or the playbook fails.
 
-To test this workflow through a fresh Lima guest without changing the normal `proteus` instance, run `make lima-acceptance` from the repository root. The disposable acceptance instance uses this production VM Definition and the `./provision` command. Its fixed development-port forwards are disabled so `proteus` can remain running. The check runs Provisioning twice, requires zero changes on the second run, and deletes only the temporary `proteus-acceptance-*` instance it created.
+To test this workflow through a fresh Lima guest without changing the normal `proteus` instance, run `make lima-acceptance` from the repository root. The disposable acceptance instance uses this production VM Definition and the `./provision` command. Its fixed development-port forwards are disabled so `proteus` can remain running. The check runs Provisioning once and deletes only the temporary `proteus-acceptance-*` instance it created.
 
 ### 3. Enter Proteus
 

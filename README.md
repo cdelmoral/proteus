@@ -63,19 +63,19 @@ Routine Provisioning reconciles the checked-in package and tool versions without
 ./provision
 ```
 
-Request safe Ubuntu package upgrades explicitly:
+To provision another running Lima instance, pass its name:
 
 ```bash
-./provision --upgrade
+./provision proteus-acceptance-example
 ```
 
-Upgrade mode does not discover new mise, Node, or pnpm releases. Change their checked-in versions before Provisioning can install a newer release. Both modes preserve unmanaged packages, files, and shell content, and both run the complete smoke phase. A second complete run should report `changed=0`, `unreachable=0`, and `failed=0`.
+Provisioning does not perform general Ubuntu package upgrades. Change checked-in tool versions when the Development Baseline needs a newer release.
 
 To apply private Git preferences, copy `provisioning/local-preferences.example.yml` to the ignored `provisioning/local-preferences.yml` and edit the copy. The file accepts only `git.name` and `git.email`; it is not a place for credentials or arbitrary Ansible variables. Missing values leave the matching guest settings unchanged.
 
-The playbook records these maintenance tags: `system`, `preferences`, `development_tools`, `shell`, `docker`, `github_cli`, and `smoke`. The `development_tools` work includes OpenCode, the LazyVim profile, and Git tooling. The `shell` work includes the Bash-native Starship prompt. The `./provision` command deliberately does not expose arbitrary Ansible arguments. Normal and upgrade runs apply every concern before the final smoke phase.
+The playbook records these maintenance tags: `system`, `preferences`, `development_tools`, `shell`, `docker`, `github_cli`, and `smoke`. The `development_tools` work includes OpenCode, the LazyVim profile, and Git tooling. The `shell` work includes the Bash-native Starship prompt. The `./provision` command deliberately does not expose arbitrary Ansible arguments.
 
-Provisioning fails without changing VM power state when Ansible or Lima is missing, the `proteus` instance does not exist or is stopped, Lima's generated SSH configuration is unreadable, or Ansible reports a failure.
+Provisioning fails without changing VM power state when Ansible or Lima is missing, the selected instance does not exist or is stopped, Lima's generated SSH configuration is unreadable, or Ansible reports a failure.
 
 ## Disposable Lima acceptance
 
@@ -87,7 +87,7 @@ make lima-acceptance
 
 The check validates the production VM Definition, creates a uniquely named `proteus-acceptance-*` instance from it, and disables only that instance's development-port forwards. The normal `proteus` instance may keep running because the disposable VM does not claim ports 3000, 5173, 8000, or 8080.
 
-The check calls `./provision` twice against the disposable instance. The first run includes the complete production smoke phase. The second run must report `changed=0`, `unreachable=0`, and `failed=0`. An exit trap deletes the exact instance created by the check, including when Provisioning or the convergence assertion fails. It refuses to use an existing name and cannot target the normal `proteus` instance.
+The check calls `./provision` once against the disposable instance. An exit trap deletes the exact instance created by the check, including when Provisioning fails. It refuses to use an existing name and cannot target the normal `proteus` instance.
 
 See [`vm/README.md`](./vm/README.md) for Credential Enrollment, Docker security, and port forwarding.
 

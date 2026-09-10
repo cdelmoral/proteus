@@ -1,6 +1,4 @@
 ---
-proteus_upgrade: false
-
 managed_user_environment:
   HOME: "{{ ansible_user_dir }}"
   XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"

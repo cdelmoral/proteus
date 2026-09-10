@@ -1,17 +1,4 @@
 ---
-- name: Apply safe Ubuntu package upgrades
-  ansible.builtin.apt:
-    update_cache: true
-    cache_valid_time: 3600
-    upgrade: safe
-    autoremove: false
-    purge: false
-    fail_on_autoremove: true
-    force_apt_get: true
-    dpkg_options: force-confdef,force-confold
-  become: true
-  when: proteus_upgrade | bool
-
 - name: Install baseline system packages
   ansible.builtin.apt:
     name: "{{ baseline_system_packages }}"
