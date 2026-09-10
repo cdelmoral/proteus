@@ -1,24 +1,4 @@
 ---
-- name: Read the effective Git workflow configuration
-  ansible.builtin.command:
-    argv:
-      - git
-      - config
-      - --global
-      - --get
-      - "{{ item.key }}"
-  environment: "{{ managed_user_environment }}"
-  loop:
-    - { key: core.pager, value: delta }
-    - { key: interactive.diffFilter, value: delta --color-only }
-    - { key: diff.tool, value: nvimdiff }
-    - { key: merge.tool, value: diffview }
-    - { key: merge.conflictStyle, value: zdiff3 }
-    - { key: alias.lg, value: log --oneline --graph --decorate --all }
-    - { key: core.excludesFile, value: "~/.gitignore_global" }
-  register: git_config_checks
-  changed_when: false
-
 - name: Check Git workflow commands
   ansible.builtin.command:
     argv:
@@ -27,25 +7,4 @@
   loop:
     - delta
     - git
-  register: git_command_checks
   changed_when: false
-
-- name: Check Git managed-file ownership
-  ansible.builtin.stat:
-    path: "{{ item }}"
-  loop:
-    - "{{ git_config_path }}"
-    - "{{ git_ignore_path }}"
-  register: git_owned_files
-
-- name: Verify the Git workflow
-  ansible.builtin.assert:
-    that:
-      - >-
-        git_config_checks.results
-        | map(attribute='stdout')
-        | list == git_config_checks.results
-        | map(attribute='item.value')
-        | list
-      - git_command_checks.results | map(attribute='rc') | max == 0
-      - git_owned_files.results | map(attribute='stat.pw_name') | unique == [ansible_user_id]

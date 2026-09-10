@@ -30,9 +30,9 @@ Apply all declared software and non-secret configuration from macOS:
 
 Provisioning runs one complete read-only smoke phase after applying the system, development tool, shell, Docker, and GitHub CLI configuration. Pass an instance name to target a running instance other than `proteus`, for example `./provision proteus-acceptance-example`.
 
-Private Git preferences may be stored in the ignored `provisioning/local-preferences.yml`; start from `provisioning/local-preferences.example.yml`. Only `git.name` and `git.email` are accepted. If the file or a field is absent, Provisioning leaves that setting alone.
+Provisioning installs the home-shaped package under `dotfiles/home` as one Managed Dotfiles collection with GNU Stow. The package contains non-secret configuration only. Git identity stays in the guest-local `~/.gitconfig.local` file.
 
-The playbook has `system`, `preferences`, `development_tools`, `shell`, `docker`, `github_cli`, and `smoke` task tags. Provisioning applies every concern and finishes with all smoke checks. Ansible leaves unmanaged packages, files, and shell content alone.
+The playbook has `system`, `development_tools`, `shell`, `dotfiles`, `docker`, `github_cli`, and `smoke` task tags. Provisioning applies every concern and finishes with its smoke checks. Stow rejects unexpected files at Managed Dotfiles paths instead of replacing them.
 
 Provisioning never starts or stops the VM. It reports an error when a host prerequisite is missing, the instance does not exist or is stopped, Lima's generated SSH configuration is unreadable, or the playbook fails.
 
@@ -68,11 +68,11 @@ Add the public key to GitHub, then authenticate GitHub CLI inside the VM:
 gh auth login
 ```
 
-Configure Git identity manually inside the VM if private local preferences do not provide it:
+Configure Git identity manually inside the VM. The stowed main Git configuration includes `~/.gitconfig.local`:
 
 ```bash
-git config --global user.name "Your Name"
-git config --global user.email "you@example.com"
+git config --file ~/.gitconfig.local user.name "Your Name"
+git config --file ~/.gitconfig.local user.email "you@example.com"
 ```
 
 AWS SSO remains future interactive Credential Enrollment. When access becomes necessary, enroll inside the VM instead of copying host credentials.

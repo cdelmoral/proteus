@@ -51,7 +51,7 @@ Clone repositories under `~/projects`.
 
 ### 4. Perform Credential Enrollment
 
-Create the SSH key and GitHub authentication inside Proteus. Configure Git identity there too unless you use private local preferences. See [`vm/README.md`](./vm/README.md) for the commands and the future AWS SSO enrollment policy.
+Create the SSH key and GitHub authentication inside Proteus. Configure Git identity in the guest-local `~/.gitconfig.local` file. See [`vm/README.md`](./vm/README.md) for the commands and the future AWS SSO enrollment policy.
 
 The Ansible cutover supports fresh VMs. Recreate a VM configured by the old shell bootstrap before using this workflow. Provisioning does not migrate or adopt bootstrap-created state.
 
@@ -71,9 +71,9 @@ To provision another running Lima instance, pass its name:
 
 Provisioning does not perform general Ubuntu package upgrades. Change checked-in tool versions when the Development Baseline needs a newer release.
 
-To apply private Git preferences, copy `provisioning/local-preferences.example.yml` to the ignored `provisioning/local-preferences.yml` and edit the copy. The file accepts only `git.name` and `git.email`; it is not a place for credentials or arbitrary Ansible variables. Missing values leave the matching guest settings unchanged.
+Managed Dotfiles live under `dotfiles/home`. Provisioning copies that package into the guest and links it into the home directory with GNU Stow. Git identity stays outside the package in `~/.gitconfig.local`.
 
-The playbook records these maintenance tags: `system`, `preferences`, `development_tools`, `shell`, `docker`, `github_cli`, and `smoke`. The `development_tools` work includes OpenCode, the LazyVim profile, and Git tooling. The `shell` work includes the Bash-native Starship prompt. The `./provision` command deliberately does not expose arbitrary Ansible arguments.
+The playbook records these maintenance tags: `system`, `development_tools`, `shell`, `dotfiles`, `docker`, `github_cli`, and `smoke`. The `./provision` command deliberately does not expose arbitrary Ansible arguments.
 
 Provisioning fails without changing VM power state when Ansible or Lima is missing, the selected instance does not exist or is stopped, Lima's generated SSH configuration is unreadable, or Ansible reports a failure.
 

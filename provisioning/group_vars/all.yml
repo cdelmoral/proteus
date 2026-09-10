@@ -62,7 +62,6 @@ pnpm_install_dir: >-
 
 prompt_packages:
   - starship
-starship_config_path: "{{ ansible_user_dir }}/.config/starship.toml"
 
 opencode_version: "1.18.29"
 opencode_download_url: >-
@@ -74,21 +73,15 @@ opencode_archive: >-
 opencode_install_dir: >-
   {{ ansible_user_dir }}/.local/share/proteus/opencode/{{ opencode_version }}
 opencode_binary: "{{ opencode_install_dir }}/opencode"
-opencode_config_dir: "{{ ansible_user_dir }}/.config/opencode"
 
 neovim_packages:
   - fd-find
   - luarocks
   - xclip
-neovim_config_dir: "{{ ansible_user_dir }}/.config/nvim"
 
 git_workflow_packages:
   - git-delta
-git_config_path: "{{ ansible_user_dir }}/.gitconfig"
-git_local_config_path: "{{ ansible_user_dir }}/.gitconfig.local"
-git_ignore_path: "{{ ansible_user_dir }}/.gitignore_global"
-
-managed_paths_state_dir: "{{ ansible_user_dir }}/.local/state/proteus/managed-paths"
+managed_dotfiles_dir: "{{ ansible_user_dir }}/.local/share/proteus/dotfiles"
 
 docker_packages:
   - containerd.io

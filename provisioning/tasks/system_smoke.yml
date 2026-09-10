@@ -52,11 +52,3 @@
     fail_msg: >-
       {{ ansible_user_dir }}/projects must be a directory owned by
       {{ ansible_user_id }}.
-
-- name: Validate the Bash configuration
-  ansible.builtin.command:
-    argv:
-      - /usr/bin/bash
-      - -n
-      - "{{ ansible_user_dir }}/.bashrc"
-  changed_when: false

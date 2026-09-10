@@ -42,11 +42,6 @@
       tags:
         - development_tools
 
-    - name: Configure the JavaScript shell environment
-      ansible.builtin.import_tasks: tasks/javascript_shell.yml
-      tags:
-        - shell
-
     - name: Configure the Bash prompt
       ansible.builtin.import_tasks: tasks/prompt.yml
       tags:
@@ -67,10 +62,10 @@
       tags:
         - development_tools
 
-    - name: Apply local preferences
-      ansible.builtin.import_tasks: tasks/preferences.yml
+    - name: Install Managed Dotfiles
+      ansible.builtin.import_tasks: tasks/dotfiles.yml
       tags:
-        - preferences
+        - dotfiles
 
     - name: Provision Docker and GitHub CLI
       ansible.builtin.import_tasks: tasks/docker_github_cli.yml

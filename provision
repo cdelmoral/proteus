@@ -4,20 +4,9 @@ set -euo pipefail
 script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 readonly script_dir
 readonly playbook="${script_dir}/provisioning/playbook.yml"
-readonly local_preferences_file="${script_dir}/provisioning/local-preferences.yml"
 
 usage() {
   printf 'Usage: %s [instance-name]\n' "${0##*/}" >&2
-}
-
-json_escape() {
-  local value="$1"
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
-  value="${value//$'\n'/\\n}"
-  value="${value//$'\r'/\\r}"
-  value="${value//$'\t'/\\t}"
-  printf '%s' "$value"
 }
 
 if [[ $# -gt 1 || ( $# -eq 1 && ( -z "$1" || "$1" == -* ) ) ]]; then
@@ -64,11 +53,4 @@ ansible_arguments=(
   "${hostname},"
   "--ssh-common-args=-F ${ssh_config}"
 )
-if [[ -f "$local_preferences_file" ]]; then
-  ansible_arguments+=(
-    --extra-vars
-    "{\"local_preferences_file\":\"$(json_escape "$local_preferences_file")\"}"
-  )
-fi
-
 exec ansible-playbook "${ansible_arguments[@]}" "$playbook"

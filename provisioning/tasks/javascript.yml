@@ -133,3 +133,10 @@
     not (pnpm_executable.stat.isreg | default(false))
     or not (pnpm_executable.stat.executable | default(false))
     or not (pnpm_runtime.stat.isdir | default(false))
+
+- name: Link the current pnpm installation
+  ansible.builtin.file:
+    src: "{{ pnpm_install_dir }}"
+    dest: "{{ pnpm_install_dir | dirname }}/current"
+    state: link
+    force: true
