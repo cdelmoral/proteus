@@ -2,7 +2,7 @@
 
 Proteus is one named, Rebuildable Dev VM for personal development on an Apple silicon Mac. Its Lima instance is named `proteus`. Normal work returns to the same VM; when it becomes broken or cluttered, replace it from the VM Definition and run Provisioning again.
 
-Proteus is also a Credential-Isolated Dev VM. It does not mount host directories, import host SSH public keys, or forward the host SSH agent. Repositories and credentials stay on the VM disk, away from macOS credentials.
+Proteus is also a Credential-Isolated Dev VM. It does not mount host directories, import host SSH public keys, or forward the host SSH agent. Repositories and VM-Local Credentials stay on the VM disk; Proteus cannot access credentials stored on macOS.
 
 ## What a rebuild restores
 
@@ -54,7 +54,7 @@ The selected instance must already exist and be running. Provisioning fails rath
 
 ## Rebuild Proteus
 
-Deleting Proteus permanently removes its repositories, uncommitted work, credentials, and other guest state. After preserving anything you need, run:
+Deleting Proteus permanently removes its repositories, uncommitted work, VM-Local Credentials, and other guest state. After preserving anything you need, run:
 
 ```bash
 limactl stop proteus
@@ -71,7 +71,7 @@ Then repeat Credential Enrollment and clone your repositories. This restores the
 
 Perform Credential Enrollment interactively inside Proteus after Provisioning. Do not copy SSH keys, GitHub tokens, AWS files, cloud credentials, or agent-provider credentials from macOS.
 
-Create a guest-local GitHub SSH key and authenticate GitHub CLI:
+Create a GitHub SSH key as a VM-Local Credential and authenticate GitHub CLI:
 
 ```bash
 ssh-keygen -t ed25519 -C "proteus-github"

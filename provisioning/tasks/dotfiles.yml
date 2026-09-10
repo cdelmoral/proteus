@@ -4,11 +4,28 @@
     name: stow
     state: present
   become: true
+  tags:
+    - dotfiles_dependency
 
 - name: Check for an installed Managed Dotfiles collection
   ansible.builtin.stat:
     path: "{{ managed_dotfiles_dir }}/home"
   register: installed_managed_dotfiles
+
+- name: Check the installed Managed Dotfiles links for conflicts
+  ansible.builtin.command:
+    argv:
+      - stow
+      - --simulate
+      - --restow
+      - --no-folding
+      - --dir
+      - "{{ managed_dotfiles_dir }}"
+      - --target
+      - "{{ ansible_user_dir }}"
+      - home
+  when: installed_managed_dotfiles.stat.isdir | default(false)
+  changed_when: false
 
 - name: Unlink the installed Managed Dotfiles collection
   ansible.builtin.command:
@@ -31,7 +48,7 @@
 
 - name: Install the Managed Dotfiles source
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/../dotfiles/"
+    src: "{{ managed_dotfiles_source_dir }}"
     dest: "{{ managed_dotfiles_dir }}"
     owner: "{{ ansible_user_id }}"
     group: "{{ ansible_user_gid }}"
@@ -44,6 +61,7 @@
   loop:
     - .bashrc
     - .gitconfig
+  when: not (installed_managed_dotfiles.stat.isdir | default(false))
 
 - name: Link the Managed Dotfiles collection
   ansible.builtin.command:

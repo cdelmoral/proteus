@@ -1,0 +1,9 @@
+---
+- name: Exercise Managed Dotfiles installation
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Run the production Managed Dotfiles tasks
+      ansible.builtin.import_tasks: ../provisioning/tasks/dotfiles.yml

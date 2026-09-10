@@ -22,57 +22,36 @@
     mode: "0755"
   become: true
 
-- name: Download the Docker repository key
+- name: Download third-party apt repository keys
   ansible.builtin.get_url:
-    url: "{{ docker_repository_key_url }}"
-    dest: "{{ docker_repository_key_path }}"
-    checksum: "{{ docker_repository_key_checksum }}"
+    url: "{{ item.key_url }}"
+    dest: "{{ item.key_path }}"
+    checksum: "{{ item.key_checksum }}"
     owner: root
     group: root
     mode: "0644"
+  loop: "{{ third_party_apt_repositories }}"
+  loop_control:
+    label: "{{ item.name }}"
   notify: Refresh apt metadata for third-party repositories
   become: true
 
-- name: Configure the Docker apt repository
+- name: Configure third-party apt repositories
   ansible.builtin.copy:
-    dest: "{{ docker_repository_source_path }}"
+    dest: "{{ item.source_path }}"
     owner: root
     group: root
     mode: "0644"
     content: |
       Types: deb
-      URIs: {{ docker_repository_uri }}
-      Suites: {{ docker_repository_suite }}
-      Components: {{ docker_repository_component }}
-      Architectures: {{ docker_repository_architecture }}
-      Signed-By: {{ docker_repository_key_path }}
-  notify: Refresh apt metadata for third-party repositories
-  become: true
-
-- name: Download the GitHub CLI repository key
-  ansible.builtin.get_url:
-    url: "{{ github_cli_repository_key_url }}"
-    dest: "{{ github_cli_repository_key_path }}"
-    checksum: "{{ github_cli_repository_key_checksum }}"
-    owner: root
-    group: root
-    mode: "0644"
-  notify: Refresh apt metadata for third-party repositories
-  become: true
-
-- name: Configure the GitHub CLI apt repository
-  ansible.builtin.copy:
-    dest: "{{ github_cli_repository_source_path }}"
-    owner: root
-    group: root
-    mode: "0644"
-    content: |
-      Types: deb
-      URIs: {{ github_cli_repository_uri }}
-      Suites: {{ github_cli_repository_suite }}
-      Components: {{ github_cli_repository_component }}
-      Architectures: {{ github_cli_repository_architecture }}
-      Signed-By: {{ github_cli_repository_key_path }}
+      URIs: {{ item.uri }}
+      Suites: {{ item.suite }}
+      Components: {{ item.component }}
+      Architectures: {{ item.architecture }}
+      Signed-By: {{ item.key_path }}
+  loop: "{{ third_party_apt_repositories }}"
+  loop_control:
+    label: "{{ item.name }}"
   notify: Refresh apt metadata for third-party repositories
   become: true
 

@@ -49,6 +49,7 @@ development_npm_packages:
     command: t3
 
 managed_dotfiles_dir: "{{ ansible_user_dir }}/.local/share/proteus/dotfiles"
+managed_dotfiles_source_dir: "{{ playbook_dir }}/../dotfiles/"
 
 docker_packages:
   - containerd.io
@@ -56,25 +57,27 @@ docker_packages:
   - docker-ce
   - docker-ce-cli
   - docker-compose-plugin
-docker_repository_key_url: https://download.docker.com/linux/ubuntu/gpg
-docker_repository_key_checksum: >-
-  sha256:1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570
-docker_repository_key_path: /etc/apt/keyrings/docker.asc
-docker_repository_source_path: /etc/apt/sources.list.d/docker.sources
-docker_repository_uri: https://download.docker.com/linux/ubuntu
-docker_repository_suite: resolute
-docker_repository_component: stable
-docker_repository_architecture: arm64
-
 github_cli_packages:
   - gh
-github_cli_repository_key_url: >-
-  https://cli.github.com/packages/githubcli-archive-keyring.gpg
-github_cli_repository_key_checksum: >-
-  sha256:6084d5d7bd8e288441e0e94fc6275570895da18e6751f70f057485dc2d1a811b
-github_cli_repository_key_path: /etc/apt/keyrings/githubcli-archive-keyring.gpg
-github_cli_repository_source_path: /etc/apt/sources.list.d/github-cli.sources
-github_cli_repository_uri: https://cli.github.com/packages
-github_cli_repository_suite: stable
-github_cli_repository_component: main
-github_cli_repository_architecture: arm64
+
+third_party_apt_repositories:
+  - name: Docker
+    key_url: https://download.docker.com/linux/ubuntu/gpg
+    key_checksum: >-
+      sha256:1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570
+    key_path: /etc/apt/keyrings/docker.asc
+    source_path: /etc/apt/sources.list.d/docker.sources
+    uri: https://download.docker.com/linux/ubuntu
+    suite: resolute
+    component: stable
+    architecture: arm64
+  - name: GitHub CLI
+    key_url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
+    key_checksum: >-
+      sha256:6084d5d7bd8e288441e0e94fc6275570895da18e6751f70f057485dc2d1a811b
+    key_path: /etc/apt/keyrings/githubcli-archive-keyring.gpg
+    source_path: /etc/apt/sources.list.d/github-cli.sources
+    uri: https://cli.github.com/packages
+    suite: stable
+    component: main
+    architecture: arm64
