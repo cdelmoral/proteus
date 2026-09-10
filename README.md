@@ -39,7 +39,7 @@ Apply all declared software and non-secret configuration:
 ./provision
 ```
 
-Provisioning ends with one read-only smoke phase that checks every baseline component.
+Provisioning installs the Development Baseline and Managed Dotfiles. Applications may download plugins and create private state on first use.
 
 ### 3. Enter Proteus
 
@@ -73,7 +73,7 @@ Provisioning does not perform general Ubuntu package upgrades. Change checked-in
 
 Managed Dotfiles live under `dotfiles/home`. Provisioning copies that package into the guest and links it into the home directory with GNU Stow. Git identity stays outside the package in `~/.gitconfig.local`.
 
-The playbook records these maintenance tags: `system`, `development_tools`, `shell`, `dotfiles`, `docker`, `github_cli`, and `smoke`. The `./provision` command deliberately does not expose arbitrary Ansible arguments.
+The playbook records three maintenance tags: `system`, `development_tools`, and `dotfiles`. The `./provision` command deliberately does not expose arbitrary Ansible arguments.
 
 Provisioning fails without changing VM power state when Ansible or Lima is missing, the selected instance does not exist or is stopped, Lima's generated SSH configuration is unreadable, or Ansible reports a failure.
 

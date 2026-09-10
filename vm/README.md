@@ -28,11 +28,11 @@ Apply all declared software and non-secret configuration from macOS:
 ./provision
 ```
 
-Provisioning runs one complete read-only smoke phase after applying the system, development tool, shell, Docker, and GitHub CLI configuration. Pass an instance name to target a running instance other than `proteus`, for example `./provision proteus-acceptance-example`.
+Provisioning applies system state, development tools, and Managed Dotfiles. Pass an instance name to target a running instance other than `proteus`, for example `./provision proteus-acceptance-example`.
 
 Provisioning installs the home-shaped package under `dotfiles/home` as one Managed Dotfiles collection with GNU Stow. The package contains non-secret configuration only. Git identity stays in the guest-local `~/.gitconfig.local` file.
 
-The playbook has `system`, `development_tools`, `shell`, `dotfiles`, `docker`, `github_cli`, and `smoke` task tags. Provisioning applies every concern and finishes with its smoke checks. Stow rejects unexpected files at Managed Dotfiles paths instead of replacing them.
+The playbook has `system`, `development_tools`, and `dotfiles` task tags. Stow rejects unexpected files at Managed Dotfiles paths instead of replacing them. Applications may download plugins and create private state on first use.
 
 Provisioning never starts or stops the VM. It reports an error when a host prerequisite is missing, the instance does not exist or is stopped, Lima's generated SSH configuration is unreadable, or the playbook fails.
 

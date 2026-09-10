@@ -1,7 +1,0 @@
----
-- name: Check the Starship command
-  ansible.builtin.command:
-    argv:
-      - starship
-      - --version
-  changed_when: false

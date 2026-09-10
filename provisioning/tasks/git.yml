@@ -1,6 +1,0 @@
----
-- name: Install the Git workflow
-  ansible.builtin.apt:
-    name: "{{ git_workflow_packages }}"
-    state: present
-  become: true

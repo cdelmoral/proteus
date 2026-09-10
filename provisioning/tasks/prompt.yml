@@ -1,6 +1,0 @@
----
-- name: Install the Bash prompt
-  ansible.builtin.apt:
-    name: "{{ prompt_packages }}"
-    state: present
-  become: true
