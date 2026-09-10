@@ -49,7 +49,6 @@ development_npm_packages:
     command: t3
 
 managed_dotfiles_dir: "{{ ansible_user_dir }}/.local/share/proteus/dotfiles"
-managed_dotfiles_source_dir: "{{ playbook_dir }}/../dotfiles/"
 
 docker_packages:
   - containerd.io

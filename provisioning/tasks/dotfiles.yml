@@ -4,8 +4,6 @@
     name: stow
     state: present
   become: true
-  tags:
-    - dotfiles_dependency
 
 - name: Check for an installed Managed Dotfiles collection
   ansible.builtin.stat:
@@ -48,7 +46,7 @@
 
 - name: Install the Managed Dotfiles source
   ansible.builtin.copy:
-    src: "{{ managed_dotfiles_source_dir }}"
+    src: "{{ playbook_dir }}/../dotfiles/"
     dest: "{{ managed_dotfiles_dir }}"
     owner: "{{ ansible_user_id }}"
     group: "{{ ansible_user_gid }}"
