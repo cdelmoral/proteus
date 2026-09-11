@@ -1,17 +1,4 @@
 ---
-- name: Apply safe Ubuntu package upgrades
-  ansible.builtin.apt:
-    update_cache: true
-    cache_valid_time: 3600
-    upgrade: safe
-    autoremove: false
-    purge: false
-    fail_on_autoremove: true
-    force_apt_get: true
-    dpkg_options: force-confdef,force-confold
-  become: true
-  when: proteus_upgrade | bool
-
 - name: Install baseline system packages
   ansible.builtin.apt:
     name: "{{ baseline_system_packages }}"
@@ -25,3 +12,78 @@
     path: "{{ ansible_user_dir }}/projects"
     state: directory
     mode: "0755"
+
+- name: Create the apt keyring directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Download third-party apt repository keys
+  ansible.builtin.get_url:
+    url: "{{ item.key_url }}"
+    dest: "{{ item.key_path }}"
+    checksum: "{{ item.key_checksum }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ third_party_apt_repositories }}"
+  loop_control:
+    label: "{{ item.name }}"
+  notify: Refresh apt metadata for third-party repositories
+  become: true
+
+- name: Configure third-party apt repositories
+  ansible.builtin.copy:
+    dest: "{{ item.source_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      Types: deb
+      URIs: {{ item.uri }}
+      Suites: {{ item.suite }}
+      Components: {{ item.component }}
+      Architectures: {{ item.architecture }}
+      Signed-By: {{ item.key_path }}
+  loop: "{{ third_party_apt_repositories }}"
+  loop_control:
+    label: "{{ item.name }}"
+  notify: Refresh apt metadata for third-party repositories
+  become: true
+
+- name: Refresh apt metadata before installing third-party packages
+  ansible.builtin.meta: flush_handlers
+
+- name: Install Docker Engine and command-line tools
+  ansible.builtin.apt:
+    name: "{{ docker_packages }}"
+    state: present
+  become: true
+
+- name: Enable and start Docker
+  ansible.builtin.service:
+    name: docker
+    enabled: true
+    state: started
+  become: true
+
+- name: Add the Lima user to the Docker group
+  ansible.builtin.user:
+    name: "{{ ansible_user_id }}"
+    groups:
+      - docker
+    append: true
+  become: true
+
+- name: Reset the connection for Docker group membership
+  ansible.builtin.meta: reset_connection
+
+- name: Install GitHub CLI
+  ansible.builtin.apt:
+    name: "{{ github_cli_packages }}"
+    state: present
+  become: true

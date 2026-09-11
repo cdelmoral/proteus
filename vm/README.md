@@ -1,98 +1,35 @@
-# Operating Proteus
+# Proteus VM details
 
-Proteus is a persistent Credential-Isolated Dev VM. Its Lima instance is named `proteus`. It runs Ubuntu 26.04 on ARM64 with no host filesystem mounts, imported host SSH public keys, or forwarded host SSH agent.
+The [main README](../README.md#operating-workflow) is the single operating guide for creating, starting, provisioning, entering, stopping, deleting, and rebuilding Proteus.
 
-## Operating workflow
+## Isolation boundary
 
-Install Lima and Ansible on the Mac before operating Proteus:
+The VM Definition creates Proteus as a Credential-Isolated Dev VM:
 
-```bash
-brew install lima ansible
-```
+- Host directories are not mounted.
+- The host SSH agent is not forwarded.
+- Host SSH public keys are not imported.
+- Repositories and VM-Local Credentials stay on the VM disk.
+- Development ports bind to host localhost by default.
 
-The Provisioning command checks host prerequisites but never installs or changes macOS software.
-
-### 1. Apply the VM Definition
-
-From the repository root, create and start Proteus from the committed VM Definition:
-
-```bash
-limactl start --name=proteus ./vm/proteus.yaml
-```
-
-### 2. Run Provisioning
-
-Apply all declared software and non-secret configuration from macOS:
-
-```bash
-./provision
-```
-
-Provisioning runs one complete read-only smoke phase after applying the system, development tool, shell, Docker, and GitHub CLI configuration. Run `./provision --upgrade` only when you want safe Ubuntu package upgrades. Managed mise, Node, and pnpm versions remain pinned in either mode.
-
-Private Git preferences may be stored in the ignored `provisioning/local-preferences.yml`; start from `provisioning/local-preferences.example.yml`. Only `git.name` and `git.email` are accepted. If the file or a field is absent, Provisioning leaves that setting alone.
-
-The playbook has `system`, `preferences`, `development_tools`, `shell`, `docker`, `github_cli`, and `smoke` task tags. Normal and upgrade Provisioning apply every concern and finish with all smoke checks. Ansible leaves unmanaged packages, files, and shell content alone.
-
-Provisioning never starts or stops the VM. It reports an error when a host prerequisite is missing, the instance does not exist or is stopped, Lima's generated SSH configuration is unreadable, or the playbook fails.
-
-To test this workflow through a fresh Lima guest without changing the normal `proteus` instance, run `make lima-acceptance` from the repository root. The disposable acceptance instance uses this production VM Definition and the `./provision` command. Its fixed development-port forwards are disabled so `proteus` can remain running. The check runs Provisioning twice, requires zero changes on the second run, and deletes only the temporary `proteus-acceptance-*` instance it created.
-
-### 3. Enter Proteus
-
-```bash
-limactl shell proteus
-```
-
-Repos should live inside the VM, under `~/projects`.
-
-### 4. Perform Credential Enrollment
-
-Complete the following interactive steps inside Proteus. They create VM-Local Credentials and never copy or forward credentials from macOS.
-
-This cutover supports fresh VMs only. Recreate a VM configured by the old shell bootstrap. Provisioning does not migrate or adopt its state.
-
-## Credential Enrollment
-
-Do not copy SSH keys, GitHub tokens, AWS files, or cloud credentials from the Mac.
-
-Generate a VM-local GitHub SSH key inside the VM:
-
-```bash
-ssh-keygen -t ed25519 -C "proteus-github"
-```
-
-Add the public key to GitHub, then authenticate GitHub CLI inside the VM:
-
-```bash
-gh auth login
-```
-
-Configure Git identity manually inside the VM if private local preferences do not provide it:
-
-```bash
-git config --global user.name "Your Name"
-git config --global user.email "you@example.com"
-```
-
-AWS SSO remains future interactive Credential Enrollment. When access becomes necessary, enroll inside the VM instead of copying host credentials.
+Provisioning runs from macOS through Lima's generated SSH configuration. This connection lets Ansible apply the Development Baseline without giving the guest access to macOS credentials. Perform Credential Enrollment inside Proteus as described in the [main README](../README.md#credential-enrollment).
 
 ## Docker risk
 
-Provisioning adds the VM user to the `docker` group. That makes `docker` usable without `sudo`, but the `docker` group is effectively root inside the VM.
+Provisioning adds the VM user to the `docker` group. This permits Docker commands without `sudo`, but it also grants root-level control inside the VM.
 
-This is acceptable because Proteus is a single-user VM and does not assume a Production AWS Role. Revisit this choice if the VM becomes multi-user, stores sensitive data, or needs a Production AWS Role.
+Proteus is a single-user VM and must not assume a Production AWS Role under this security model. Revisit the design if the VM becomes multi-user, stores sensitive data, or needs a Production AWS Role.
 
 ## Ports
 
-The default config forwards common dev ports to the Mac only:
+The VM Definition forwards these guest ports to localhost on the Mac:
 
 - `127.0.0.1:3000`
 - `127.0.0.1:5173`
 - `127.0.0.1:8000`
 - `127.0.0.1:8080`
 
-To expose one port to selected devices on the local network, stop the VM, edit that port in `vm/proteus.yaml`, and change `hostIP` to `"0.0.0.0"`:
+To expose one port to selected devices on the local network, stop Proteus and change that port's `hostIP` in `vm/proteus.yaml` to `"0.0.0.0"`:
 
 ```yaml
 portForwards:
@@ -101,6 +38,6 @@ portForwards:
     hostIP: "0.0.0.0"
 ```
 
-Start the dev server so it listens beyond guest localhost when the framework requires it. For example, Vite usually needs `--host 0.0.0.0`.
+Some development servers listen only on guest localhost by default. Configure the server to listen on all guest interfaces when LAN access needs it. For Vite, pass `--host 0.0.0.0`.
 
-Switch the port back to `127.0.0.1` when LAN testing is done.
+Change `hostIP` back to `"127.0.0.1"` when LAN testing is done.

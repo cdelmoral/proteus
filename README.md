@@ -1,8 +1,18 @@
 # Proteus
 
-Proteus is a persistent, general-purpose Credential-Isolated Dev VM for macOS. It runs on [Lima](https://lima-vm.io/) and keeps development credentials separate from the host.
+Proteus is one named, Rebuildable Dev VM for personal development on an Apple silicon Mac. Its Lima instance is named `proteus`. Normal work returns to the same VM; when it becomes broken or cluttered, replace it from the VM Definition and run Provisioning again.
 
-Projects, tools, and VM-Local Credentials live on the VM disk. Proteus does not mount host directories, import host SSH public keys, or forward the host SSH agent. Create GitHub and cloud credentials inside the VM instead of copying them from macOS.
+Proteus is also a Credential-Isolated Dev VM. It does not mount host directories, import host SSH public keys, or forward the host SSH agent. Repositories and VM-Local Credentials stay on the VM disk; Proteus cannot access credentials stored on macOS.
+
+## What a rebuild restores
+
+Provisioning applies the Development Baseline: the software and non-secret configuration needed for development. It uses Ansible for system state and tools, then installs `dotfiles/home` as one opaque Managed Dotfiles collection with GNU Stow. Ansible does not manage each application's configuration separately.
+
+The Development Baseline includes command-line development tools, pinned language runtimes, Docker, GitHub CLI, Neovim, OpenCode, T3 Code, and the Managed Dotfiles. Applications may download plugins or create caches and private state when first run after a rebuild.
+
+A rebuild does not restore VM-Local Credentials, project repositories, uncommitted work, command history, caches, application state, or workspace state. Back up or publish work that must survive before deleting Proteus. Credential Enrollment and repository cloning happen again in the new guest.
+
+T3 Code is installed as a command only. Provisioning does not start it, run a background service, expose a port, pair a client, configure T3 Connect, or choose another connection method.
 
 ## Requirements
 
@@ -11,94 +21,82 @@ Projects, tools, and VM-Local Credentials live on the VM disk. Proteus does not 
 - Lima 2.2 or later
 - Ansible
 
-Install the host tools before creating Proteus:
+Install the host tools:
 
 ```bash
 brew install lima ansible
 ```
 
-The Provisioning command checks these prerequisites but does not install or change software on macOS.
+Provisioning checks these prerequisites but does not install or change macOS software.
 
 ## Operating workflow
 
-Run these steps from the repository root.
+Run these commands from the repository root. Lima owns the VM lifecycle; Provisioning never creates, starts, stops, or deletes a VM.
 
-### 1. Apply the VM Definition
+| Operation | Command |
+| --- | --- |
+| Create Proteus from the VM Definition | `limactl create --name=proteus ./vm/proteus.yaml` |
+| Start Proteus | `limactl start proteus` |
+| Apply Provisioning | `./provision` |
+| Open a guest shell | `limactl shell proteus` |
+| Stop Proteus | `limactl stop proteus` |
+| Delete a stopped Proteus VM | `limactl delete proteus` |
 
-Create and start the VM from the committed VM Definition:
+Create, start, and provision the VM before first use. On later days, start it and open a shell. Put repositories under `~/projects` inside the guest.
+
+`./provision` accepts zero or one instance name. With no argument it targets `proteus`. To provision another running instance:
 
 ```bash
-limactl start --name=proteus ./vm/proteus.yaml
+./provision proteus-acceptance-example
 ```
 
-### 2. Run Provisioning
+The selected instance must already exist and be running. Provisioning fails rather than changing its lifecycle state.
 
-Apply all declared software and non-secret configuration:
+## Rebuild Proteus
+
+Deleting Proteus permanently removes its repositories, uncommitted work, VM-Local Credentials, and other guest state. After preserving anything you need, run:
 
 ```bash
+limactl stop proteus
+limactl delete proteus
+limactl create --name=proteus ./vm/proteus.yaml
+limactl start proteus
 ./provision
-```
-
-Provisioning ends with one read-only smoke phase that checks every baseline component.
-
-### 3. Enter Proteus
-
-```bash
 limactl shell proteus
 ```
 
-Clone repositories under `~/projects`.
+Then repeat Credential Enrollment and clone your repositories. This restores the Development Baseline, not the deleted VM's contents.
 
-### 4. Perform Credential Enrollment
+## Credential Enrollment
 
-Create the SSH key and GitHub authentication inside Proteus. Configure Git identity there too unless you use private local preferences. See [`vm/README.md`](./vm/README.md) for the commands and the future AWS SSO enrollment policy.
+Perform Credential Enrollment interactively inside Proteus after Provisioning. Do not copy SSH keys, GitHub tokens, AWS files, cloud credentials, or agent-provider credentials from macOS.
 
-The Ansible cutover supports fresh VMs. Recreate a VM configured by the old shell bootstrap before using this workflow. Provisioning does not migrate or adopt bootstrap-created state.
-
-## Provisioning behavior
-
-Routine Provisioning reconciles the checked-in package and tool versions without requesting an Ubuntu package upgrade:
+Create a GitHub SSH key as a VM-Local Credential and authenticate GitHub CLI:
 
 ```bash
-./provision
+ssh-keygen -t ed25519 -C "proteus-github"
+gh auth login
 ```
 
-Request safe Ubuntu package upgrades explicitly:
+Add the generated public key to GitHub. Set Git identity in the guest-local file included by the Managed Dotfiles Git configuration:
 
 ```bash
-./provision --upgrade
+git config --file ~/.gitconfig.local user.name "Your Name"
+git config --file ~/.gitconfig.local user.email "you@example.com"
 ```
 
-Upgrade mode does not discover new mise, Node, or pnpm releases. Change their checked-in versions before Provisioning can install a newer release. Both modes preserve unmanaged packages, files, and shell content, and both run the complete smoke phase. A second complete run should report `changed=0`, `unreachable=0`, and `failed=0`.
+Enroll AWS, cloud, OpenCode, T3 Code, and other credentials inside the guest only when needed. Credential Enrollment does not weaken the isolation boundary by importing host credentials.
 
-To apply private Git preferences, copy `provisioning/local-preferences.example.yml` to the ignored `provisioning/local-preferences.yml` and edit the copy. The file accepts only `git.name` and `git.email`; it is not a place for credentials or arbitrary Ansible variables. Missing values leave the matching guest settings unchanged.
+## Manual acceptance
 
-The playbook records these maintenance tags: `system`, `preferences`, `development_tools`, `shell`, `docker`, `github_cli`, and `smoke`. The `development_tools` work includes OpenCode, the LazyVim profile, and Git tooling. The `shell` work includes the Bash-native Starship prompt. The `./provision` command deliberately does not expose arbitrary Ansible arguments. Normal and upgrade runs apply every concern before the final smoke phase.
-
-Provisioning fails without changing VM power state when Ansible or Lima is missing, the `proteus` instance does not exist or is stopped, Lima's generated SSH configuration is unreadable, or Ansible reports a failure.
-
-## Disposable Lima acceptance
-
-Run the full macOS-to-guest acceptance check on an Apple silicon Mac with Lima and Ansible installed:
+Run the real macOS-to-Lima acceptance check manually:
 
 ```bash
 make lima-acceptance
 ```
 
-The check validates the production VM Definition, creates a uniquely named `proteus-acceptance-*` instance from it, and disables only that instance's development-port forwards. The normal `proteus` instance may keep running because the disposable VM does not claim ports 3000, 5173, 8000, or 8080.
+The check validates the production VM Definition, creates and starts a uniquely named `proteus-acceptance-*` VM, and invokes the production Provisioning command once. Fresh-VM Provisioning's exit status is the behavioral assertion. Setup or cleanup failures also fail the command. The check does not run Provisioning a second time or test exact convergence.
 
-The check calls `./provision` twice against the disposable instance. The first run includes the complete production smoke phase. The second run must report `changed=0`, `unreachable=0`, and `failed=0`. An exit trap deletes the exact instance created by the check, including when Provisioning or the convergence assertion fails. It refuses to use an existing name and cannot target the normal `proteus` instance.
+The check refuses to adopt an existing instance and deletes the VM it created after success or failure. It disables development-port forwarding for that VM, so the normal `proteus` instance may remain running.
 
-See [`vm/README.md`](./vm/README.md) for Credential Enrollment, Docker security, and port forwarding.
-
-## Isolation boundary
-
-Proteus isolates credentials by configuration and working practice:
-
-- Host directories are not mounted into the VM.
-- The host SSH agent is not forwarded.
-- Host SSH public keys are not imported.
-- Repositories and credentials stay on the VM disk.
-- Forwarded development ports listen on host localhost by default.
-
-Proteus has passwordless `sudo`, and its user belongs to the `docker` group. Either grants root-level control inside the VM. Do not give Proteus a Production AWS Role without reviewing this security model.
+See [`vm/README.md`](./vm/README.md) for the isolation boundary, Docker privilege, and port forwarding.

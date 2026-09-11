@@ -1,4 +1,10 @@
 ---
+- name: Install development tool packages
+  ansible.builtin.apt:
+    name: "{{ development_tool_packages }}"
+    state: present
+  become: true
+
 - name: Create directories for managed development tools
   ansible.builtin.file:
     path: "{{ item }}"
@@ -9,7 +15,6 @@
     - "{{ ansible_user_dir }}/.config/mise"
     - "{{ ansible_user_dir }}/.local/bin"
     - "{{ mise_install_dir }}"
-    - "{{ pnpm_install_dir | dirname }}"
 
 - name: Download the pinned mise binary
   ansible.builtin.get_url:
@@ -87,49 +92,48 @@
     - "{{ managed_node.stdout | trim }}/lib/node_modules/corepack"
     - "{{ ansible_user_dir }}/.local/share/mise/shims/corepack"
 
-- name: Download the pinned pnpm archive
-  ansible.builtin.get_url:
-    url: "{{ pnpm_download_url }}"
-    dest: "{{ pnpm_archive }}"
-    checksum: "{{ pnpm_checksum }}"
-    mode: "0644"
+- name: Check the pinned npm packages
+  ansible.builtin.command:
+    argv:
+      - "{{ managed_node.stdout | trim }}/bin/npm"
+      - list
+      - --global
+      - --depth=0
+      - "{{ item.package }}@{{ item.version }}"
+  loop: "{{ development_npm_packages }}"
+  register: installed_npm_packages
+  environment: "{{ managed_user_environment }}"
+  changed_when: false
+  failed_when: false
 
-- name: Inspect the pnpm executable
-  ansible.builtin.stat:
-    path: "{{ pnpm_install_dir }}/pnpm"
-  register: pnpm_executable
+- name: Install the pinned npm packages
+  ansible.builtin.command:
+    argv:
+      - "{{ managed_node.stdout | trim }}/bin/npm"
+      - install
+      - --global
+      - --no-audit
+      - --no-fund
+      - "{{ item.item.package }}@{{ item.item.version }}"
+  loop: "{{ installed_npm_packages.results }}"
+  environment: >-
+    {{ managed_user_environment | combine({
+      "PATH": (managed_node.stdout | trim) ~ "/bin:" ~ ansible_env.PATH
+    }) }}
+  when: item.rc != 0
+  changed_when: true
 
-- name: Inspect the pnpm runtime files
-  ansible.builtin.stat:
-    path: "{{ pnpm_install_dir }}/dist"
-  register: pnpm_runtime
-
-- name: Remove an incomplete pnpm installation
+- name: Link the npm package commands
   ansible.builtin.file:
-    path: "{{ pnpm_install_dir }}"
-    state: absent
-  when: >-
-    not (pnpm_executable.stat.isreg | default(false))
-    or not (pnpm_executable.stat.executable | default(false))
-    or not (pnpm_runtime.stat.isdir | default(false))
+    src: "{{ managed_node.stdout | trim }}/bin/{{ item.command }}"
+    dest: "{{ ansible_user_dir }}/.local/bin/{{ item.command }}"
+    state: link
+    force: true
+  loop: "{{ development_npm_packages }}"
 
-- name: Create the pinned pnpm installation directory
+- name: Link the Ubuntu fd command under its expected name
   ansible.builtin.file:
-    path: "{{ pnpm_install_dir }}"
-    state: directory
-    mode: "0755"
-  when: >-
-    not (pnpm_executable.stat.isreg | default(false))
-    or not (pnpm_executable.stat.executable | default(false))
-    or not (pnpm_runtime.stat.isdir | default(false))
-
-- name: Install the pinned pnpm archive
-  ansible.builtin.unarchive:
-    src: "{{ pnpm_archive }}"
-    dest: "{{ pnpm_install_dir }}"
-    remote_src: true
-    mode: "u+rwX,go+rX"
-  when: >-
-    not (pnpm_executable.stat.isreg | default(false))
-    or not (pnpm_executable.stat.executable | default(false))
-    or not (pnpm_runtime.stat.isdir | default(false))
+    src: /usr/bin/fdfind
+    dest: "{{ ansible_user_dir }}/.local/bin/fd"
+    state: link
+    follow: false
