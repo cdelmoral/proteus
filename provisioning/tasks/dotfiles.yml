@@ -1,0 +1,74 @@
+---
+- name: Install GNU Stow
+  ansible.builtin.apt:
+    name: stow
+    state: present
+  become: true
+
+- name: Check for an installed Managed Dotfiles collection
+  ansible.builtin.stat:
+    path: "{{ managed_dotfiles_dir }}/home"
+  register: installed_managed_dotfiles
+
+- name: Check the installed Managed Dotfiles links for conflicts
+  ansible.builtin.command:
+    argv:
+      - stow
+      - --simulate
+      - --restow
+      - --no-folding
+      - --dir
+      - "{{ managed_dotfiles_dir }}"
+      - --target
+      - "{{ ansible_user_dir }}"
+      - home
+  when: installed_managed_dotfiles.stat.isdir | default(false)
+  changed_when: false
+
+- name: Unlink the installed Managed Dotfiles collection
+  ansible.builtin.command:
+    argv:
+      - stow
+      - --delete
+      - --no-folding
+      - --dir
+      - "{{ managed_dotfiles_dir }}"
+      - --target
+      - "{{ ansible_user_dir }}"
+      - home
+  when: installed_managed_dotfiles.stat.isdir | default(false)
+  changed_when: true
+
+- name: Remove the installed Managed Dotfiles source
+  ansible.builtin.file:
+    path: "{{ managed_dotfiles_dir }}"
+    state: absent
+
+- name: Install the Managed Dotfiles source
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../dotfiles/"
+    dest: "{{ managed_dotfiles_dir }}"
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_gid }}"
+    mode: preserve
+
+- name: Remove declared fresh-image conflicts
+  ansible.builtin.file:
+    path: "{{ ansible_user_dir }}/{{ item }}"
+    state: absent
+  loop:
+    - .bashrc
+    - .gitconfig
+  when: not (installed_managed_dotfiles.stat.isdir | default(false))
+
+- name: Link the Managed Dotfiles collection
+  ansible.builtin.command:
+    argv:
+      - stow
+      - --no-folding
+      - --dir
+      - "{{ managed_dotfiles_dir }}"
+      - --target
+      - "{{ ansible_user_dir }}"
+      - home
+  changed_when: true

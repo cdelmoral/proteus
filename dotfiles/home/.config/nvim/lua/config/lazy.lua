@@ -1,8 +1,5 @@
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not (vim.uv or vim.loop).fs_stat(lazypath) then
-  if vim.env.PROTEUS_SMOKE == "1" then
-    error("lazy.nvim is missing during the read-only smoke phase")
-  end
   local out = vim.fn.system({
     "git",
     "clone",
@@ -24,7 +21,7 @@ require("lazy").setup({
   },
   defaults = { lazy = false, version = false },
   install = {
-    missing = vim.env.PROTEUS_SMOKE ~= "1",
+    missing = true,
     colorscheme = { "catppuccin", "habamax" },
   },
   checker = { enabled = false },
