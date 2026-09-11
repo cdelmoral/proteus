@@ -8,5 +8,3 @@
 *.pem
 id_ed25519*
 id_rsa*
-
-/provisioning/local-preferences.yml
