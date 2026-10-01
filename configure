@@ -6,14 +6,7 @@ readonly script_dir
 # shellcheck source=lib/config.sh
 source "${script_dir}/lib/config.sh"
 
-readonly config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/proteus"
-readonly config_file="${config_dir}/config"
-readonly config_key='github_token_1password_reference'
-
-current_reference=''
-if [[ -f "$config_file" ]]; then
-  current_reference="$(proteus_config_value "$config_file" "$config_key")"
-fi
+current_reference="$(proteus_github_reference)"
 
 if [[ -n "$current_reference" ]]; then
   printf 'GitHub token 1Password secret reference [%s]: ' "$current_reference"
@@ -28,12 +21,6 @@ if [[ -z "$reference" ]]; then
   exit 1
 fi
 
-mkdir -p "$config_dir"
-umask 077
-temporary_file="$(mktemp "${config_file}.XXXXXX")"
-trap 'rm -f "$temporary_file"' EXIT
-printf '%s=%s\n' "$config_key" "$reference" >"$temporary_file"
-mv "$temporary_file" "$config_file"
-trap - EXIT
+config_file="$(proteus_save_github_reference "$reference")"
 
 printf 'Saved GitHub credential source to %s.\n' "$config_file"
