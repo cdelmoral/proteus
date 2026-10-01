@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly secrets_dir="$HOME/.local/share/proteus/secrets"
+readonly token_file="${secrets_dir}/github-token"
+
+if ! command -v gh >/dev/null 2>&1; then
+  printf 'GitHub CLI is not installed. Run Provisioning before Credential Enrollment.\n' >&2
+  exit 1
+fi
+
+token=''
+IFS= read -r token || [[ -n "$token" ]]
+readonly token
+
+if [[ -z "$token" ]]; then
+  printf 'No GitHub token was received.\n' >&2
+  exit 1
+fi
+
+umask 077
+mkdir -p "$secrets_dir"
+chmod 700 "$secrets_dir"
+temporary_file="$(mktemp "${secrets_dir}/.github-token.XXXXXX")"
+trap 'rm -f "$temporary_file"' EXIT
+printf '%s' "$token" >"$temporary_file"
+chmod 600 "$temporary_file"
+
+if ! GH_TOKEN="$token" gh auth status --hostname github.com >/dev/null 2>&1; then
+  printf 'GitHub rejected the configured token. The installed credential was not changed.\n' >&2
+  exit 1
+fi
+
+if ! GH_TOKEN="$token" gh auth setup-git --hostname github.com --force >/dev/null 2>&1; then
+  printf 'GitHub CLI could not configure Git for github.com. The installed credential was not changed.\n' >&2
+  exit 1
+fi
+
+mv "$temporary_file" "$token_file"
+trap - EXIT

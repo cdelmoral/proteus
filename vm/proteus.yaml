@@ -62,4 +62,6 @@ message: |
   Enter the VM:
     limactl shell proteus
 
-  Perform Credential Enrollment inside the VM. See vm/README.md.
+  Run GitHub Credential Enrollment from macOS, then enter the VM:
+    ./enroll github
+    limactl shell proteus

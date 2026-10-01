@@ -6,6 +6,8 @@ on:
     paths:
       - ".github/**"
       - "configure"
+      - "dotfiles/**"
+      - "enroll"
       - "Makefile"
       - "provision"
       - "provisioning/**"
@@ -18,6 +20,8 @@ on:
     paths:
       - ".github/**"
       - "configure"
+      - "dotfiles/**"
+      - "enroll"
       - "Makefile"
       - "provision"
       - "provisioning/**"
