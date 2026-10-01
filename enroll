@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly config_file="${XDG_CONFIG_HOME:-$HOME/.config}/proteus/config"
+readonly config_key='github_token_1password_reference'
+
+usage() {
+  printf 'Usage: %s github [instance-name]\n' "${0##*/}" >&2
+}
+
+if [[ $# -lt 1 || $# -gt 2 || "$1" != github || ( $# -eq 2 && ( -z "$2" || "$2" == -* ) ) ]]; then
+  usage
+  exit 2
+fi
+readonly instance="${2:-proteus}"
+
+if ! command -v op >/dev/null 2>&1; then
+  printf 'op is required. Install 1Password CLI with: brew install --cask 1password-cli\n' >&2
+  exit 1
+fi
+
+if ! command -v limactl >/dev/null 2>&1; then
+  printf 'limactl is required. Install it with: brew install lima\n' >&2
+  exit 1
+fi
+
+if [[ ! -r "$config_file" ]]; then
+  printf 'GitHub credential source is not configured. Run ./configure first.\n' >&2
+  exit 1
+fi
+
+reference=''
+while IFS='=' read -r key value || [[ -n "$key" ]]; do
+  if [[ "$key" == "$config_key" ]]; then
+    reference="$value"
+  fi
+done <"$config_file"
+readonly reference
+
+if [[ -z "$reference" ]]; then
+  printf 'GitHub credential source is not configured. Run ./configure first.\n' >&2
+  exit 1
+fi
+
+if ! instance_status="$(limactl list --tty=false --format='{{.Status}}' "$instance" 2>/dev/null)" ||
+  [[ -z "$instance_status" ]]; then
+  printf "Lima instance '%s' does not exist.\n" "$instance" >&2
+  exit 1
+fi
+
+if [[ "$instance_status" != Running ]]; then
+  printf "Lima instance '%s' is not running (status: %s).\n" "$instance" "${instance_status:-unknown}" >&2
+  exit 1
+fi
+
+# HOME must expand in the guest.
+# shellcheck disable=SC2016
+if ! limactl shell --tty=false "$instance" sh -c \
+  'test -x "$HOME/.local/bin/proteus-enroll-github" && command -v gh >/dev/null' >/dev/null 2>&1; then
+  printf "Lima instance '%s' has not been provisioned with GitHub CLI. Run ./provision first.\n" "$instance" >&2
+  exit 1
+fi
+
+# HOME must expand in the guest.
+# shellcheck disable=SC2016
+if ! op read "$reference" |
+  limactl shell --tty=false "$instance" sh -c \
+    'exec "$HOME/.local/bin/proteus-enroll-github"'; then
+  printf "GitHub Credential Enrollment failed for Lima instance '%s'.\n" "$instance" >&2
+  exit 1
+fi
+
+printf "Enrolled the GitHub credential in Lima instance '%s'. Open a new interactive guest shell to use it.\n" "$instance"
