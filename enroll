@@ -6,9 +6,6 @@ readonly script_dir
 # shellcheck source=lib/config.sh
 source "${script_dir}/lib/config.sh"
 
-readonly config_file="${XDG_CONFIG_HOME:-$HOME/.config}/proteus/config"
-readonly config_key='github_token_1password_reference'
-
 usage() {
   printf 'Usage: %s github [instance-name]\n' "${0##*/}" >&2
 }
@@ -29,12 +26,10 @@ if ! command -v limactl >/dev/null 2>&1; then
   exit 1
 fi
 
-if [[ ! -r "$config_file" ]]; then
+if ! reference="$(proteus_github_reference)"; then
   printf 'GitHub credential source is not configured. Run ./configure first.\n' >&2
   exit 1
 fi
-
-reference="$(proteus_config_value "$config_file" "$config_key")"
 readonly reference
 
 if [[ -z "$reference" ]]; then

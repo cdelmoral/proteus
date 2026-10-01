@@ -5,7 +5,10 @@ esac
 
 export PATH="$HOME/.local/bin:$PATH"
 
-github_token_file="$HOME/.local/share/proteus/secrets/github-token"
+# shellcheck source=dotfiles/home/.local/lib/proteus/credentials.sh
+source "$HOME/.local/lib/proteus/credentials.sh"
+github_token_file="$(proteus_github_token_file)"
+unset -f proteus_github_token_file
 if [[ -r "$github_token_file" ]]; then
   GH_TOKEN="$(<"$github_token_file")"
   export GH_TOKEN

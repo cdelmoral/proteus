@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly secrets_dir="$HOME/.local/share/proteus/secrets"
-readonly token_file="${secrets_dir}/github-token"
+# shellcheck source=dotfiles/home/.local/lib/proteus/credentials.sh
+source "$HOME/.local/lib/proteus/credentials.sh"
+token_file="$(proteus_github_token_file)"
+readonly token_file
+readonly secrets_dir="${token_file%/*}"
 
 if ! command -v gh >/dev/null 2>&1; then
   printf 'GitHub CLI is not installed. Run Provisioning before Credential Enrollment.\n' >&2
