@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - ".github/**"
+      - "configure"
       - "Makefile"
       - "provision"
       - "provisioning/**"
@@ -16,6 +17,7 @@ on:
       - master
     paths:
       - ".github/**"
+      - "configure"
       - "Makefile"
       - "provision"
       - "provisioning/**"
