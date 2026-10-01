@@ -20,14 +20,28 @@ T3 Code is installed as a command only. Provisioning does not start it, run a ba
 - [Homebrew](https://brew.sh/)
 - Lima 2.2 or later
 - Ansible
+- [1Password CLI](https://developer.1password.com/docs/cli/) for GitHub Credential Enrollment
 
 Install the host tools:
 
 ```bash
 brew install lima ansible
+brew install --cask 1password-cli
 ```
 
 Provisioning checks these prerequisites but does not install or change macOS software.
+
+## Host configuration
+
+Tell Proteus which 1Password field contains the fine-grained GitHub personal access token:
+
+```bash
+./configure
+```
+
+Enter the field's 1Password secret reference when prompted. Proteus stores the reference, not the token, in `${XDG_CONFIG_HOME:-$HOME/.config}/proteus/config`. It treats the reference as opaque text and does not contact 1Password. Run `./configure` again to accept the current reference or replace it.
+
+The `op` command is not needed while configuring the reference. It is required later when Credential Enrollment resolves that reference.
 
 ## Operating workflow
 
