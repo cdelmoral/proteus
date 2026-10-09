@@ -66,5 +66,5 @@ jobs:
             "$archive" | sha256sum --check
           sudo tar --extract --gzip --file "$archive" --directory /usr/local
 
-      - name: Run static checks
-        run: make static
+      - name: Run static checks and enrollment tests
+        run: make static test
