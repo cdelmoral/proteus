@@ -116,6 +116,45 @@
     force: true
   loop: "{{ development_npm_packages }}"
 
+- name: Read the registered Claude Code marketplaces
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_user_dir }}/.local/bin/claude"
+      - plugin
+      - marketplace
+      - list
+      - --json
+  register: claude_marketplaces
+  environment: "{{ managed_user_environment }}"
+  changed_when: false
+
+- name: Register the official Claude Code marketplace
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_user_dir }}/.local/bin/claude"
+      - plugin
+      - marketplace
+      - add
+      - anthropics/claude-plugins-official
+  environment: >-
+    {{ managed_user_environment | combine({
+      "CLAUDE_CODE_PLUGIN_PREFER_HTTPS": "1"
+    }) }}
+  when: >-
+    'claude-plugins-official' not in
+    (claude_marketplaces.stdout | from_json | map(attribute='name') | list)
+  changed_when: true
+
+- name: Install Matt Pocock's Claude Code skills
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_user_dir }}/.local/bin/claude"
+      - plugin
+      - install
+      - mattpocock-skills@claude-plugins-official
+  environment: "{{ managed_user_environment }}"
+  changed_when: true
+
 - name: Link the Ubuntu fd command under its expected name
   ansible.builtin.file:
     src: /usr/bin/fdfind
