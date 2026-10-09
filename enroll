@@ -7,33 +7,40 @@ readonly script_dir
 source "${script_dir}/lib/config.sh"
 
 usage() {
-  printf 'Usage: %s github [instance-name]\n' "${0##*/}" >&2
+  printf 'Usage: %s {github|claude} [instance-name]\n' "${0##*/}" >&2
 }
 
-if [[ $# -lt 1 || $# -gt 2 || "$1" != github || ( $# -eq 2 && ( -z "$2" || "$2" == -* ) ) ]]; then
+if [[ $# -lt 1 || $# -gt 2 || ( "$1" != github && "$1" != claude ) ||
+  ( $# -eq 2 && ( -z "$2" || "$2" == -* ) ) ]]; then
   usage
   exit 2
 fi
+readonly tool="$1"
 readonly instance="${2:-proteus}"
 
-if ! command -v op >/dev/null 2>&1; then
-  printf 'op is required. Install 1Password CLI with: brew install --cask 1password-cli\n' >&2
+if [[ "$tool" == github ]]; then
+  if ! command -v op >/dev/null 2>&1; then
+    printf 'op is required. Install 1Password CLI with: brew install --cask 1password-cli\n' >&2
+    exit 1
+  fi
+
+  if ! reference="$(proteus_github_reference)"; then
+    printf 'GitHub credential source is not configured. Run ./configure first.\n' >&2
+    exit 1
+  fi
+  readonly reference
+
+  if [[ -z "$reference" ]]; then
+    printf 'GitHub credential source is not configured. Run ./configure first.\n' >&2
+    exit 1
+  fi
+elif [[ ! -t 0 || ! -t 1 ]]; then
+  printf 'Claude Code Credential Enrollment requires an interactive terminal for input and output.\n' >&2
   exit 1
 fi
 
 if ! command -v limactl >/dev/null 2>&1; then
   printf 'limactl is required. Install it with: brew install lima\n' >&2
-  exit 1
-fi
-
-if ! reference="$(proteus_github_reference)"; then
-  printf 'GitHub credential source is not configured. Run ./configure first.\n' >&2
-  exit 1
-fi
-readonly reference
-
-if [[ -z "$reference" ]]; then
-  printf 'GitHub credential source is not configured. Run ./configure first.\n' >&2
   exit 1
 fi
 
@@ -46,6 +53,35 @@ fi
 if [[ "$instance_status" != Running ]]; then
   printf "Lima instance '%s' is not running (status: %s).\n" "$instance" "${instance_status:-unknown}" >&2
   exit 1
+fi
+
+if [[ "$tool" == claude ]]; then
+  # HOME must expand in the guest. mise supplies the managed Node runtime.
+  # shellcheck disable=SC2016
+  if ! limactl shell --tty=false --start=false "$instance" sh -c \
+    'test -x "$HOME/.local/bin/claude" && test -x "$HOME/.local/bin/mise"' >/dev/null 2>&1; then
+    printf "Lima instance '%s' has not been provisioned with Claude Code. Run ./provision first.\n" "$instance" >&2
+    exit 1
+  fi
+
+  printf 'Open the login URL in your macOS browser, authorize access, and paste the returned code into this terminal if prompted.\n'
+
+  # shellcheck disable=SC2016
+  if ! limactl shell --tty=true --start=false "$instance" sh -c \
+    'exec "$HOME/.local/bin/mise" exec -- "$HOME/.local/bin/claude" auth login'; then
+    printf "Claude Code Credential Enrollment failed for Lima instance '%s'.\n" "$instance" >&2
+    exit 1
+  fi
+
+  # shellcheck disable=SC2016
+  if ! limactl shell --tty=false --start=false "$instance" sh -c \
+    'exec "$HOME/.local/bin/mise" exec -- "$HOME/.local/bin/claude" auth status' >/dev/null 2>&1; then
+    printf "Claude Code could not confirm authentication in Lima instance '%s'.\n" "$instance" >&2
+    exit 1
+  fi
+
+  printf "Enrolled Claude Code in Lima instance '%s'.\n" "$instance"
+  exit 0
 fi
 
 # HOME must expand in the guest.
