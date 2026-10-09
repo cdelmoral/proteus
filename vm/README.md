@@ -1,6 +1,6 @@
 # Proteus VM details
 
-The [main README](../README.md#operating-workflow) is the single operating guide for creating, starting, provisioning, entering, stopping, deleting, and rebuilding Proteus.
+The [usage guide](../docs/usage.md#operating-workflow) is the single operating guide for creating, starting, provisioning, entering, stopping, deleting, and rebuilding Proteus.
 
 ## Isolation boundary
 
@@ -14,7 +14,7 @@ The VM Definition creates Proteus as a Credential-Isolated Dev VM:
 
 Provisioning runs from macOS through Lima's generated SSH configuration. This connection lets Ansible apply the Development Baseline without giving the guest access to macOS credentials. GitHub Credential Enrollment is a separate host command that sends one token through standard input after 1Password resolves its configured reference. The guest cannot invoke 1Password or access unrelated host credentials.
 
-The installed GitHub token is readable by the guest user and guest root. Processes launched from a new interactive Bash session inherit it as `GH_TOKEN`. This boundary protects the host credential store and ambient host credentials, not a credential deliberately installed in the guest. See the [main README](../README.md#credential-enrollment) for the enrollment procedure.
+The installed GitHub token is readable by the guest user and guest root. Processes launched from a new interactive Bash session inherit it as `GH_TOKEN`. This boundary protects the host credential store and ambient host credentials, not a credential deliberately installed in the guest. See the [Credential Enrollment guide](../docs/credentials.md) for the enrollment procedure.
 
 ## Docker risk
 
