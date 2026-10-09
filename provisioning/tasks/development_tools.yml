@@ -92,21 +92,7 @@
     - "{{ managed_node.stdout | trim }}/lib/node_modules/corepack"
     - "{{ ansible_user_dir }}/.local/share/mise/shims/corepack"
 
-- name: Check the pinned npm packages
-  ansible.builtin.command:
-    argv:
-      - "{{ managed_node.stdout | trim }}/bin/npm"
-      - list
-      - --global
-      - --depth=0
-      - "{{ item.package }}@{{ item.version }}"
-  loop: "{{ development_npm_packages }}"
-  register: installed_npm_packages
-  environment: "{{ managed_user_environment }}"
-  changed_when: false
-  failed_when: false
-
-- name: Install the pinned npm packages
+- name: Install the latest npm packages
   ansible.builtin.command:
     argv:
       - "{{ managed_node.stdout | trim }}/bin/npm"
@@ -114,13 +100,12 @@
       - --global
       - --no-audit
       - --no-fund
-      - "{{ item.item.package }}@{{ item.item.version }}"
-  loop: "{{ installed_npm_packages.results }}"
+      - "{{ item.package }}@latest"
+  loop: "{{ development_npm_packages }}"
   environment: >-
     {{ managed_user_environment | combine({
       "PATH": (managed_node.stdout | trim) ~ "/bin:" ~ ansible_env.PATH
     }) }}
-  when: item.rc != 0
   changed_when: true
 
 - name: Link the npm package commands

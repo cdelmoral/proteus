@@ -8,7 +8,9 @@ Proteus is also a Credential-Isolated Dev VM. It does not mount host directories
 
 Provisioning applies the Development Baseline: the software and non-secret configuration needed for development. It uses Ansible for system state and tools, then installs `dotfiles/home` as one opaque Managed Dotfiles collection with GNU Stow. Ansible does not manage each application's configuration separately.
 
-The Development Baseline includes command-line development tools, pinned language runtimes, Docker, GitHub CLI, Neovim, OpenCode, T3 Code, and the Managed Dotfiles. Applications may download plugins or create caches and private state when first run after a rebuild.
+The Development Baseline includes command-line development tools, pinned language runtimes, Docker, GitHub CLI, Neovim, Claude Code, OpenCode, T3 Code, and the Managed Dotfiles. Applications may download plugins or create caches and private state when first run after a rebuild.
+
+Each Provisioning run installs pnpm, Claude Code, OpenCode, and T3 Code from their npm `latest` tags, upgrading existing installations when newer releases are available.
 
 A rebuild does not restore VM-Local Credentials, project repositories, uncommitted work, command history, caches, application state, or workspace state. Back up or publish work that must survive before deleting Proteus. Credential Enrollment and repository cloning happen again in the new guest.
 
@@ -85,7 +87,7 @@ git config --file ~/.gitconfig.local user.name "Your Name"
 git config --file ~/.gitconfig.local user.email "you@example.com"
 ```
 
-Enroll AWS, cloud, OpenCode, T3 Code, and other credentials inside the guest only when needed. Credential Enrollment does not weaken the isolation boundary by importing host credentials.
+Enroll AWS, cloud, Claude Code, OpenCode, T3 Code, and other credentials inside the guest only when needed. Credential Enrollment does not weaken the isolation boundary by importing host credentials.
 
 ## Manual acceptance
 
