@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+readonly script_dir
+# shellcheck source=lib/config.sh
+source "${script_dir}/lib/config.sh"
+
+current_reference="$(proteus_github_reference)"
+
+if [[ -n "$current_reference" ]]; then
+  printf 'GitHub token 1Password secret reference [%s]: ' "$current_reference"
+else
+  printf 'GitHub token 1Password secret reference: '
+fi
+IFS= read -r reference
+reference="${reference:-$current_reference}"
+
+if [[ -z "$reference" ]]; then
+  printf 'A GitHub token 1Password secret reference is required.\n' >&2
+  exit 1
+fi
+
+config_file="$(proteus_save_github_reference "$reference")"
+
+printf 'Saved GitHub credential source to %s.\n' "$config_file"

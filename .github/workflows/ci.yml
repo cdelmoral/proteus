@@ -5,6 +5,10 @@ on:
   pull_request:
     paths:
       - ".github/**"
+      - "configure"
+      - "dotfiles/**"
+      - "enroll"
+      - "lib/**"
       - "Makefile"
       - "provision"
       - "provisioning/**"
@@ -16,6 +20,10 @@ on:
       - master
     paths:
       - ".github/**"
+      - "configure"
+      - "dotfiles/**"
+      - "enroll"
+      - "lib/**"
       - "Makefile"
       - "provision"
       - "provisioning/**"

@@ -9,10 +9,12 @@ The VM Definition creates Proteus as a Credential-Isolated Dev VM:
 - Host directories are not mounted.
 - The host SSH agent is not forwarded.
 - Host SSH public keys are not imported.
-- Repositories and VM-Local Credentials stay on the VM disk.
+- Repositories, VM-Local Credentials, and installed Host-Injected Credentials stay on the VM disk.
 - Development ports bind to host localhost by default.
 
-Provisioning runs from macOS through Lima's generated SSH configuration. This connection lets Ansible apply the Development Baseline without giving the guest access to macOS credentials. Perform Credential Enrollment inside Proteus as described in the [main README](../README.md#credential-enrollment).
+Provisioning runs from macOS through Lima's generated SSH configuration. This connection lets Ansible apply the Development Baseline without giving the guest access to macOS credentials. GitHub Credential Enrollment is a separate host command that sends one token through standard input after 1Password resolves its configured reference. The guest cannot invoke 1Password or access unrelated host credentials.
+
+The installed GitHub token is readable by the guest user and guest root. Processes launched from a new interactive Bash session inherit it as `GH_TOKEN`. This boundary protects the host credential store and ambient host credentials, not a credential deliberately installed in the guest. See the [main README](../README.md#credential-enrollment) for the enrollment procedure.
 
 ## Docker risk
 
