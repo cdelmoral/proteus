@@ -13,7 +13,7 @@ A virtual machine reused during normal development but replaced from its VM Defi
 _Avoid_: Disposable VM, permanent workstation
 
 **Development Baseline**:
-The software and non-secret configuration restored by Provisioning. It excludes VM-Local Credentials, project repositories, uncommitted work, caches, command history, and workspace state.
+The software and non-secret configuration restored by Provisioning. It excludes credentials, project repositories, uncommitted work, caches, command history, and workspace state.
 _Avoid_: Backup, workstation snapshot
 
 **Managed Dotfiles**:
@@ -21,11 +21,15 @@ The non-secret user configuration included in the Development Baseline. Proteus 
 _Avoid_: Provisioning preferences, managed paths
 
 **Credential-Isolated Dev VM**:
-A Linux virtual machine used for development where GitHub, AWS, and cloud credentials are created and stored inside the guest rather than shared from the macOS host.
+A Linux virtual machine used for development with no access to the macOS credential store or ambient host credentials. It may use VM-Local Credentials and selected Host-Injected Credentials.
 _Avoid_: Separate dev computer, credential-scoped dev environment
 
 **VM-Local Credential**:
 A credential created, stored, and used inside the Credential-Isolated Dev VM rather than copied from or delegated by the macOS host.
+_Avoid_: Shared credential, forwarded credential
+
+**Host-Injected Credential**:
+A credential selected and transferred by the trusted macOS host without giving the Credential-Isolated Dev VM access to its source credential store or unrelated host credentials.
 _Avoid_: Shared credential, forwarded credential
 
 **Production AWS Role**:
@@ -41,5 +45,5 @@ The repeatable application of software and non-secret configuration to Proteus a
 _Avoid_: Bootstrap, setup script
 
 **Credential Enrollment**:
-The interactive creation and authorization of VM-Local Credentials after Provisioning.
+The explicit creation, host injection, or authorization of credentials after Provisioning.
 _Avoid_: Credential provisioning, credential import
