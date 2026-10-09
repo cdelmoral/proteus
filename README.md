@@ -12,7 +12,7 @@ The Development Baseline includes command-line development tools, pinned languag
 
 Each Provisioning run installs pnpm, Claude Code, OpenCode, and T3 Code from their npm `latest` tags, upgrading existing installations when newer releases are available.
 
-Provisioning also registers the official Claude Code plugin marketplace and runs `claude plugin install mattpocock-skills@claude-plugins-official` as the guest user. The skills are installed at user scope for all projects. Installing this public plugin does not require Claude Code sign-in; authenticate inside the guest when you start using Claude Code.
+Provisioning also registers the official Claude Code plugin marketplace and runs `claude plugin install mattpocock-skills@claude-plugins-official` as the guest user. The skills are installed at user scope for all projects. Installing this public plugin does not require Claude Code sign-in; run `./enroll claude` when you start using Claude Code.
 
 A rebuild does not restore VM-Local Credentials, Host-Injected Credentials, project repositories, uncommitted work, command history, caches, application state, or workspace state. Back up or publish work that must survive before deleting Proteus. Credential Enrollment and repository cloning happen again in the new guest.
 
@@ -57,17 +57,19 @@ Run these commands from the repository root. Lima owns the VM lifecycle; Provisi
 | Start Proteus | `limactl start proteus` |
 | Apply Provisioning | `./provision` |
 | Enroll the configured GitHub credential | `./enroll github` |
+| Authorize Claude Code inside the guest | `./enroll claude` |
 | Open a guest shell | `limactl shell proteus` |
 | Stop Proteus | `limactl stop proteus` |
 | Delete a stopped Proteus VM | `limactl delete proteus` |
 
 Create, start, and provision the VM before first use. On later days, start it and open a shell. Put repositories under `~/projects` inside the guest.
 
-`./provision` and `./enroll github` accept an optional instance name and target `proteus` by default. The selected instance must already exist and be running. Neither command changes its lifecycle state. For example:
+`./provision` and both `./enroll` commands accept an optional instance name and target `proteus` by default. The selected instance must already exist and be running. Neither command changes its lifecycle state. For example:
 
 ```bash
 ./provision proteus-acceptance-example
 ./enroll github proteus-acceptance-example
+./enroll claude proteus-acceptance-example
 ```
 
 ## Rebuild Proteus
@@ -81,12 +83,15 @@ limactl create --name=proteus ./vm/proteus.yaml
 limactl start proteus
 ./provision
 ./enroll github
+./enroll claude
 limactl shell proteus
 ```
 
 Then clone your repositories and repeat any other Credential Enrollment. This restores the Development Baseline and the selected GitHub credential, not the rest of the deleted VM's contents.
 
 ## Credential Enrollment
+
+### GitHub
 
 After Provisioning, enroll the fine-grained GitHub personal access token selected by `./configure`:
 
@@ -101,7 +106,23 @@ The guest validates the token before atomically replacing `~/.local/share/proteu
 
 New interactive Bash sessions read the file and export `GH_TOKEN`. Commands launched from those shells inherit the token, including GitHub CLI and Git's GitHub CLI credential helper for HTTPS operations. Proteus does not export it system-wide, to services, or deliberately to non-interactive Bash commands. The guest's primary user and guest root can read the installed token.
 
-The guest receives only this selected Host-Injected Credential. It cannot invoke 1Password, browse the vault, or retrieve another host credential. Continue to create AWS, cloud, Claude Code, OpenCode, T3 Code, and other credentials inside the guest only when needed.
+The guest receives only this selected Host-Injected Credential. It cannot invoke 1Password, browse the vault, or retrieve another host credential. Continue to create AWS, cloud, OpenCode, T3 Code, and other credentials inside the guest only when needed.
+
+### Claude Code
+
+After Provisioning, run this command from an interactive macOS terminal:
+
+```bash
+./enroll claude
+```
+
+Proteus runs `claude auth login` inside the guest using its managed Node runtime. Open the generated login URL in your macOS browser and authorize access. If the browser returns a code, paste it into the waiting terminal. This is Claude Code's documented [manual login flow](https://code.claude.com/docs/en/authentication#log-in-to-claude-code) for sessions where the browser cannot reach the local callback server.
+
+Enrollment requires terminal input and output; piping input or redirecting output fails before login starts. It does not need 1Password or a configured GitHub credential source. The selected instance must already be running and provisioned with Claude Code. Enrollment never starts or provisions it. Proteus reports success only after login succeeds and `claude auth status` confirms authentication.
+
+Claude Code owns storage and renewal of the resulting VM-Local Credential. Using the host browser for authorization does not expose its cookies or credential store to the guest. Proteus does not copy a host Claude credential or capture the returned code. The credential persists across VM stops, is removed when the VM is deleted, and must be enrolled again after a rebuild. Run `./enroll claude` again when Claude Code requires a new login.
+
+## Git identity
 
 Set Git identity in the guest-local file included by the Managed Dotfiles Git configuration:
 
@@ -110,7 +131,9 @@ git config --file ~/.gitconfig.local user.name "Your Name"
 git config --file ~/.gitconfig.local user.email "you@example.com"
 ```
 
-To verify the complete flow manually on macOS, create and start a fresh VM, run `./provision`, run `./enroll github`, and enter a new guest shell. Confirm `gh auth status` and one HTTPS Git operation succeed. Do not print or inspect the token.
+## Automated checks
+
+Run `make static test` to validate Provisioning and the VM Definition and exercise Credential Enrollment with simulated CLI tools. The enrollment tests use separate host and guest homes and a real terminal without contacting 1Password or Claude.
 
 ## Manual acceptance
 
@@ -123,5 +146,9 @@ make lima-acceptance
 The check validates the production VM Definition, creates and starts a uniquely named `proteus-acceptance-*` VM, and invokes the production Provisioning command once. Fresh-VM Provisioning's exit status is the behavioral assertion. Setup or cleanup failures also fail the command. The check does not run Provisioning a second time or test exact convergence.
 
 The check refuses to adopt an existing instance and deletes the VM it created after success or failure. It disables development-port forwarding for that VM, so the normal `proteus` instance may remain running.
+
+To verify GitHub Credential Enrollment manually on macOS, create and start a fresh VM, run `./provision`, run `./enroll github`, and enter a new guest shell. Confirm `gh auth status` and one HTTPS Git operation succeed. Do not print or inspect the token.
+
+Run `./enroll claude` from an interactive terminal, complete browser authorization, and confirm `claude auth status` succeeds inside the guest. Stop and start the VM to confirm the login persists. Repeat enrollment after a rebuild.
 
 See [`vm/README.md`](./vm/README.md) for the isolation boundary, Docker privilege, and port forwarding.
