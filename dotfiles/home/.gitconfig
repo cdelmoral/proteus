@@ -1,6 +1,5 @@
 [core]
 	pager = delta
-	excludesFile = ~/.gitignore_global
 	commentChar = ;
 [interactive]
 	diffFilter = delta --color-only
