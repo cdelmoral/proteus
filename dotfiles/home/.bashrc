@@ -17,4 +17,6 @@ unset github_token_file
 
 eval "$("$HOME/.local/bin/mise" activate bash)"
 
+eval "$(fzf --bash)"
+
 eval "$(starship init bash)"

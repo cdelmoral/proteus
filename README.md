@@ -8,7 +8,11 @@ Proteus is also a Credential-Isolated Dev VM. It does not mount host directories
 
 Provisioning applies the Development Baseline: the software and non-secret configuration needed for development. It uses Ansible for system state and tools, then installs `dotfiles/home` as one opaque Managed Dotfiles collection with GNU Stow. Ansible does not manage each application's configuration separately.
 
-The Development Baseline includes command-line development tools, pinned language runtimes, Docker, GitHub CLI, Neovim, OpenCode, T3 Code, and the Managed Dotfiles. Applications may download plugins or create caches and private state when first run after a rebuild.
+The Development Baseline includes command-line development tools, pinned language runtimes, Docker, GitHub CLI, Neovim, Claude Code, OpenCode, T3 Code, and the Managed Dotfiles. Applications may download plugins or create caches and private state when first run after a rebuild.
+
+Each Provisioning run installs pnpm, Claude Code, OpenCode, and T3 Code from their npm `latest` tags, upgrading existing installations when newer releases are available.
+
+Provisioning also registers the official Claude Code plugin marketplace and runs `claude plugin install mattpocock-skills@claude-plugins-official` as the guest user. The skills are installed at user scope for all projects. Installing this public plugin does not require Claude Code sign-in; authenticate inside the guest when you start using Claude Code.
 
 A rebuild does not restore VM-Local Credentials, Host-Injected Credentials, project repositories, uncommitted work, command history, caches, application state, or workspace state. Back up or publish work that must survive before deleting Proteus. Credential Enrollment and repository cloning happen again in the new guest.
 
@@ -97,7 +101,7 @@ The guest validates the token before atomically replacing `~/.local/share/proteu
 
 New interactive Bash sessions read the file and export `GH_TOKEN`. Commands launched from those shells inherit the token, including GitHub CLI and Git's GitHub CLI credential helper for HTTPS operations. Proteus does not export it system-wide, to services, or deliberately to non-interactive Bash commands. The guest's primary user and guest root can read the installed token.
 
-The guest receives only this selected Host-Injected Credential. It cannot invoke 1Password, browse the vault, or retrieve another host credential. Continue to create AWS, cloud, OpenCode, T3 Code, and other credentials inside the guest only when needed.
+The guest receives only this selected Host-Injected Credential. It cannot invoke 1Password, browse the vault, or retrieve another host credential. Continue to create AWS, cloud, Claude Code, OpenCode, T3 Code, and other credentials inside the guest only when needed.
 
 Set Git identity in the guest-local file included by the Managed Dotfiles Git configuration:
 
