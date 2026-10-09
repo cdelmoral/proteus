@@ -39,13 +39,12 @@ development_tool_packages:
 
 development_npm_packages:
   - package: pnpm
-    version: "12.3.4"
     command: pnpm
+  - package: "@anthropic-ai/claude-code"
+    command: claude
   - package: opencode-ai
-    version: "1.18.29"
     command: opencode
   - package: t3
-    version: "0.0.40"
     command: t3
 
 managed_dotfiles_dir: "{{ ansible_user_dir }}/.local/share/proteus/dotfiles"
