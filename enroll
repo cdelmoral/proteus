@@ -7,10 +7,10 @@ readonly script_dir
 source "${script_dir}/lib/config.sh"
 
 usage() {
-  printf 'Usage: %s {github|claude} [instance-name]\n' "${0##*/}" >&2
+  printf 'Usage: %s {github|claude|t3} [instance-name]\n' "${0##*/}" >&2
 }
 
-if [[ $# -lt 1 || $# -gt 2 || ( "$1" != github && "$1" != claude ) ||
+if [[ $# -lt 1 || $# -gt 2 || ( "$1" != github && "$1" != claude && "$1" != t3 ) ||
   ( $# -eq 2 && ( -z "$2" || "$2" == -* ) ) ]]; then
   usage
   exit 2
@@ -35,7 +35,11 @@ if [[ "$tool" == github ]]; then
     exit 1
   fi
 elif [[ ! -t 0 || ! -t 1 ]]; then
-  printf 'Claude Code Credential Enrollment requires an interactive terminal for input and output.\n' >&2
+  if [[ "$tool" == t3 ]]; then
+    printf 'T3 Enrollment requires an interactive terminal for input and output.\n' >&2
+  else
+    printf 'Claude Code Credential Enrollment requires an interactive terminal for input and output.\n' >&2
+  fi
   exit 1
 fi
 
@@ -53,6 +57,26 @@ fi
 if [[ "$instance_status" != Running ]]; then
   printf "Lima instance '%s' is not running (status: %s).\n" "$instance" "${instance_status:-unknown}" >&2
   exit 1
+fi
+
+if [[ "$tool" == t3 ]]; then
+  # HOME must expand in the guest. The helper owns guest setup and verification.
+  # shellcheck disable=SC2016
+  if ! limactl shell --tty=false --start=false "$instance" sh -c \
+    'test -x "$HOME/.local/bin/t3" && test -x "$HOME/.local/bin/mise" && test -x "$HOME/.local/bin/proteus-enroll-t3" && command -v python3 >/dev/null'; then
+    printf "Lima instance '%s' has not been provisioned with T3 Enrollment. Run ./provision first.\n" "$instance" >&2
+    exit 1
+  fi
+
+  # shellcheck disable=SC2016
+  if ! limactl shell --tty=true --start=false "$instance" sh -c \
+    'exec "$HOME/.local/bin/proteus-enroll-t3"'; then
+    printf "T3 Enrollment is incomplete for Lima instance '%s'. Completed steps were preserved.\n" "$instance" >&2
+    exit 1
+  fi
+
+  printf "Enrolled T3 in Lima instance '%s'. Local setup is verified; connect from another device to test remote access.\n" "$instance"
+  exit 0
 fi
 
 if [[ "$tool" == claude ]]; then

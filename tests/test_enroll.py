@@ -15,7 +15,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 
 
-class EnrollmentTest(unittest.TestCase):
+class EnrollmentHarness(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
@@ -113,6 +113,8 @@ else:
     def calls(self):
         return [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
 
+
+class EnrollmentTest(EnrollmentHarness):
     def test_claude_login_uses_guest_and_interactive_terminal(self):
         for instance in ("proteus", "custom-instance"):
             with self.subTest(instance=instance):

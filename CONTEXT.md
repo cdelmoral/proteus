@@ -47,3 +47,7 @@ _Avoid_: Bootstrap, setup script
 **Credential Enrollment**:
 The explicit creation, host injection, or authorization of credentials after Provisioning.
 _Avoid_: Credential provisioning, credential import
+
+**T3 Enrollment**:
+The explicit authorization of Proteus for T3 Connect and establishment of persistent remote access after Provisioning. Provider Credential Enrollment is separate.
+_Avoid_: T3 login, provider enrollment

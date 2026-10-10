@@ -4,7 +4,7 @@ Run these commands from the repository root.
 
 ## Automated checks
 
-Run `make static test` to validate Provisioning and the VM Definition and exercise Credential Enrollment with simulated CLI tools. The enrollment tests use separate host and guest homes and a real terminal without contacting 1Password or Claude.
+Run `make static test` to validate Provisioning and the VM Definition and exercise enrollment with simulated CLI tools. The enrollment tests use separate host and guest homes and a real terminal without contacting 1Password, Claude, or T3 Connect. T3 tests simulate systemd, lingering, and provider-independent Connect setup, including partial failures, retries, version differences, and existing-server protection.
 
 ## Manual acceptance
 
@@ -21,5 +21,9 @@ The check refuses to adopt an existing instance and deletes the VM it created af
 To verify GitHub Credential Enrollment manually on macOS, create and start a fresh VM, run `./provision`, run `./enroll github`, and enter a new guest shell. Confirm `gh auth status` and one HTTPS Git operation succeed. Do not print or inspect the token.
 
 Run `./enroll claude` from an interactive terminal, complete browser authorization, and confirm `claude auth status` succeeds inside the guest. Stop and start the VM to confirm the login persists. Repeat enrollment after a rebuild.
+
+For T3, run `./enroll t3` on a fresh provisioned VM from an interactive macOS terminal. Accept relay-client and service installation, approve the browser code, and confirm local verification completes. Sign in to the same T3 Connect account from another device and connect to the environment. Close the guest shell, then stop/start the VM; confirm the service and remote access return without running enrollment again. Authenticate a provider separately to run agent work.
+
+Repeat T3 enrollment and confirm it leaves the running service untouched. Verify that a service on a different version from the npm CLI still passes when healthy. Decline or interrupt setup, confirm incomplete setup is reported, and retry using the saved authorization. Start a foreground server and confirm enrollment refuses takeover. For a running service started before Connect was enabled, confirm enrollment reports an explicit restart requirement rather than restarting it; perform the restart when ready, then retry. After deleting the VM, deregister its old cloud environment and enroll the replacement afresh.
 
 See [Credential Enrollment](./credentials.md) for authentication details and [VM details](../vm/README.md) for the isolation boundary, Docker privilege, and port forwarding.

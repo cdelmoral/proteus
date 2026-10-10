@@ -1,0 +1,250 @@
+#!/usr/bin/env python3
+"""Enroll the guest's T3 environment without taking over an existing server.
+
+T3 v0.0.45's CLI status, runtime file, and desired-link format are the boundary.
+Unknown formats fail closed. Status output and credentials are never printed.
+"""
+
+from datetime import datetime
+import json
+import os
+from pathlib import Path
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+import time
+
+
+UNIT = "t3code.service"
+STARTUP_TIMEOUT = 60
+
+
+class Incomplete(Exception):
+    """An actionable enrollment failure, with completed steps left intact."""
+
+
+def read_command(arguments):
+    return subprocess.run(
+        arguments, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30,
+    )
+
+
+class Enrollment:
+    def __init__(self):
+        self.home = Path.home()
+        self.base = Path(os.environ.get("T3CODE_HOME", self.home / ".t3")).expanduser().resolve()
+        self.state = self.base / "userdata"
+        self.cli = [
+            str(self.home / ".local/bin/mise"), "exec", "--",
+            str(self.home / ".local/bin/t3"),
+        ]
+
+    def t3(self, *arguments, interactive=False):
+        command = [*self.cli, *arguments, "--base-dir", str(self.base)]
+        if interactive:
+            return subprocess.run(command).returncode
+        result = read_command(command)
+        if result.returncode:
+            raise Incomplete("Could not read T3 Connect state. Inspect `t3 connect status` in the guest.")
+        try:
+            value = json.loads(result.stdout)
+            if not isinstance(value, dict):
+                raise ValueError
+            for name in ("desired", "authenticated", "linked"):
+                if type(value.get(name)) is not bool:
+                    raise ValueError
+            if value.get("relayClient", {}).get("status") not in ("available", "missing", "unsupported"):
+                raise ValueError
+            return value
+        except (ValueError, AttributeError):
+            raise Incomplete("Unrecognized T3 Connect status. Check the installed T3 version.") from None
+
+    def service(self):
+        result = read_command([
+            "systemctl", "--user", "show", UNIT,
+            "--property=LoadState,ActiveState,UnitFileState,Environment",
+        ])
+        properties = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+        if properties.get("LoadState") == "not-found":
+            # A unit written without daemon-reload is still an existing install.
+            if (self.home / ".config/systemd/user" / UNIT).exists():
+                raise Incomplete("The T3 service needs repair. Inspect `t3 service status`, then run `t3 service install` explicitly.")
+            return None
+        if result.returncode or properties.get("LoadState") != "loaded":
+            raise Incomplete("Could not inspect the T3 user service. Check `systemctl --user status t3code.service`.")
+        return properties
+
+    def running_server(self):
+        path = self.state / "server-runtime.json"
+        if not path.exists():
+            return None
+        try:
+            value = json.loads(path.read_text())
+            if not isinstance(value, dict) or type(value.get("version")) is not int or value["version"] != 1:
+                raise ValueError
+            pid = value["pid"]
+            if type(pid) is not int or pid <= 1:
+                raise ValueError
+            if not isinstance(value["startedAt"], str):
+                raise ValueError
+            started = datetime.fromisoformat(value["startedAt"].replace("Z", "+00:00"))
+            if started.tzinfo is None:
+                raise ValueError
+            os.kill(pid, 0)
+            return value
+        except ProcessLookupError:
+            return None
+        except (ValueError, KeyError, TypeError, PermissionError):
+            raise Incomplete("Could not safely identify the existing T3 server. Inspect `t3 service status` before retrying.") from None
+
+    def protect_server(self, service):
+        server = self.running_server()
+        if server and (server.get("serviceManaged") is not True or service is None):
+            raise Incomplete("A foreground T3 server is running. Stop it explicitly when its work is finished, then retry enrollment.")
+        return server
+
+    def ensure_lingering(self):
+        def linger():
+            return read_command([
+                "loginctl", "show-user", str(os.getuid()), "--property=Linger", "--value",
+            ])
+
+        result = linger()
+        if result.returncode or result.stdout.strip() not in ("yes", "no"):
+            raise Incomplete("Could not inspect lingering. Check that systemd-logind is available in the guest.")
+        if result.stdout.strip() == "no":
+            result = read_command(["sudo", "-n", "loginctl", "enable-linger", str(os.getuid())])
+            verified = linger()
+            if result.returncode or verified.returncode or verified.stdout.strip() != "yes":
+                raise Incomplete('Could not enable lingering. Run `sudo loginctl enable-linger "$(id -un)"` in the guest, then retry.')
+
+    def healthy_service(self, service):
+        if not service or service.get("ActiveState") != "active" or service.get("UnitFileState") != "enabled":
+            return False
+        environment = dict(
+            item.split("=", 1) for item in shlex.split(service.get("Environment", "")) if "=" in item
+        )
+        if environment.get("T3CODE_HOME") != str(self.base):
+            raise Incomplete("The existing T3 service uses another data directory. Manage that service explicitly before enrolling this environment.")
+        if (self.base / "runtime/.restart-pending").exists():
+            raise Incomplete("A T3 service update is pending. Run `t3 service restart` explicitly when ready, then retry.")
+        return True
+
+    def use_service_runtime(self):
+        # Verify with the installed service's CLI: the npm CLI may expect a newer
+        # relay-client version even while this service remains healthy.
+        try:
+            state = json.loads((self.base / "runtime/service-state.json").read_text())
+            version = state["activeVersion"]
+            if not isinstance(version, str) or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.+-]+)?", version):
+                raise ValueError
+            if state.get("protocol") != 3 or state.get("update", {}).get("status") == "pending":
+                raise ValueError
+            runtime = self.base / "runtime/versions" / version
+            executable = runtime / "t3"
+            if not executable.is_file() or not os.access(executable, os.X_OK):
+                raise ValueError
+            if (runtime / ".install-complete").read_text().strip() != version:
+                raise ValueError
+            self.cli = [str(executable)]
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            raise Incomplete("The installed T3 service runtime needs repair. Inspect `t3 service status`, then repair it explicitly when ready.") from None
+
+    def managed_link(self):
+        try:
+            return (self.state / "secrets/cloud-cli-desired-link.bin").read_bytes() in (b"managed", b"true")
+        except FileNotFoundError:
+            return False
+
+    def activated(self, status, server):
+        if not all(status[name] for name in ("desired", "authenticated", "linked")):
+            return False
+        if status["relayClient"]["status"] != "available" or not server:
+            return False
+        if server.get("serviceManaged") is not True:
+            return False
+        # This is non-secret desired-link configuration, despite its store name.
+        # Comparing it to startup detects links saved after the current boot.
+        desired = self.state / "secrets/cloud-cli-desired-link.bin"
+        try:
+            if not self.managed_link():
+                return False
+            started = datetime.fromisoformat(server["startedAt"].replace("Z", "+00:00")).timestamp()
+            return desired.stat().st_mtime <= started
+        except FileNotFoundError:
+            return False
+
+    def run(self):
+        if not sys.stdin.isatty() or not sys.stdout.isatty():
+            raise Incomplete("T3 Enrollment requires an interactive terminal for input and output.")
+        if os.getuid() == 0:
+            raise Incomplete("Run T3 Enrollment as the normal guest user, not root.")
+        for command in ("systemctl", "loginctl", "sudo"):
+            if not shutil.which(command):
+                raise Incomplete(f"{command} is required in the guest. Run Provisioning first.")
+        if read_command(["systemctl", "--user", "show-environment"]).returncode:
+            raise Incomplete("The systemd user manager is unavailable. Open a normal guest login session and retry.")
+
+        service = self.service()
+        server = self.protect_server(service)
+        self.ensure_lingering()
+        if service:
+            if not self.healthy_service(service) or not server:
+                raise Incomplete("The existing T3 service needs repair. Inspect `t3 service status`, then run `t3 service install` explicitly when ready.")
+            self.use_service_runtime()
+            status = self.t3("connect", "status", "--json")
+            if self.activated(status, server):
+                return
+            # Link has no service offer, so it cannot update/restart an existing unit.
+            if not status["desired"] or not status["authenticated"] or not self.managed_link() or status["relayClient"]["status"] != "available":
+                if self.t3("connect", "link", "--headless", interactive=True):
+                    raise Incomplete("T3 authorization or linking failed. Retry enrollment; completed steps were preserved.")
+            raise Incomplete("The running T3 service needs link activation. Run `t3 service restart` explicitly when ready, then retry enrollment.")
+
+        self.t3("connect", "status", "--json")
+        print("Open T3's browser URL on macOS, confirm the short code, and approve. Accept relay-client and background-service installation when offered.", flush=True)
+        # Recheck before onboarding, which can otherwise replace an existing unit.
+        if self.service() is not None:
+            raise Incomplete("A T3 service appeared during enrollment. Retry to verify it without replacing it.")
+        self.protect_server(None)
+        if self.t3("connect", "--headless", interactive=True):
+            raise Incomplete("T3 setup failed. Retry enrollment; completed steps were preserved.")
+
+        status = self.t3("connect", "status", "--json")
+        if not status["authenticated"] or not status["desired"] or status["relayClient"]["status"] != "available":
+            raise Incomplete("T3 authorization, link configuration, or relay-client installation is incomplete. Retry enrollment and complete T3's prompts.")
+        if not self.healthy_service(self.service()):
+            raise Incomplete("T3 service installation is incomplete. Inspect `t3 service status`, then retry enrollment or run `t3 service install` explicitly.")
+        self.use_service_runtime()
+        print("Verifying local T3 startup (up to 60 seconds)...", flush=True)
+        deadline = time.monotonic() + STARTUP_TIMEOUT
+        while time.monotonic() < deadline:
+            service = self.service()
+            server = self.protect_server(service)
+            if not self.healthy_service(service):
+                raise Incomplete("The T3 service stopped or is not enabled. Inspect `t3 service status` and its log.")
+            if self.activated(status, server):
+                return
+            time.sleep(1)
+            status = self.t3("connect", "status", "--json")
+        raise Incomplete("T3 has not completed local linking/startup. Inspect `t3 service status` and its log, then retry enrollment.")
+
+
+def main():
+    try:
+        Enrollment().run()
+    except (Incomplete, OSError, subprocess.TimeoutExpired, ValueError) as error:
+        # Unexpected OS/subprocess details may include captured status output.
+        message = str(error) if isinstance(error, Incomplete) else "Could not verify T3 setup. Inspect `t3 service status` and retry."
+        print(message, file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print("T3 Enrollment interrupted. Completed steps were preserved.", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
