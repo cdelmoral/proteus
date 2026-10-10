@@ -22,6 +22,7 @@ limactl start proteus
 # Enroll credentials for the tools you use
 ./enroll github
 ./enroll claude
+./enroll t3
 
 # Enter the VM
 limactl shell proteus
@@ -32,7 +33,7 @@ Keep repositories under `~/projects` inside the guest. Deleting the VM during a 
 ## Documentation
 
 - [Usage](./docs/usage.md): requirements, host configuration, daily commands, Git identity, and rebuilding
-- [Credentials](./docs/credentials.md): GitHub and Claude Code enrollment
+- [Credentials](./docs/credentials.md): GitHub, Claude Code, and T3 enrollment
 - [Provisioning](./docs/provisioning.md): installed tools, updates, dotfiles, and what a rebuild restores
 - [Testing](./docs/testing.md): automated checks and manual acceptance
 - [VM details](./vm/README.md): isolation, Docker privileges, and port forwarding
