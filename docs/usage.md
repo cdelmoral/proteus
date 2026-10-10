@@ -44,18 +44,20 @@ Run these commands from the repository root. Lima owns the VM lifecycle; Provisi
 | Apply Provisioning | `./provision` |
 | Enroll the configured GitHub credential | `./enroll github` |
 | Authorize Claude Code inside the guest | `./enroll claude` |
+| Authorize T3 Connect and install its persistent guest service | `./enroll t3` |
 | Open a guest shell | `limactl shell proteus` |
 | Stop Proteus | `limactl stop proteus` |
 | Delete a stopped Proteus VM | `limactl delete proteus` |
 
 Create, start, and provision the VM before first use. On later days, start it and open a shell. Put repositories under `~/projects` inside the guest.
 
-`./provision` and both `./enroll` commands accept an optional instance name and target `proteus` by default. The selected instance must already exist and be running. Neither command changes its lifecycle state. For example:
+`./provision` and all `./enroll` commands accept an optional instance name and target `proteus` by default. The selected instance must already exist and be running. Neither command changes its lifecycle state. For example:
 
 ```bash
 ./provision proteus-acceptance-example
 ./enroll github proteus-acceptance-example
 ./enroll claude proteus-acceptance-example
+./enroll t3 proteus-acceptance-example
 ```
 
 ## Git identity
@@ -69,7 +71,11 @@ git config --file ~/.gitconfig.local user.email "you@example.com"
 
 ## Rebuild Proteus
 
-Deleting Proteus permanently removes its repositories, uncommitted work, VM-Local Credentials, Host-Injected Credentials, and other guest state. After preserving anything you need, run:
+Deleting Proteus permanently removes its repositories, uncommitted work, VM-Local Credentials, Host-Injected Credentials, and other guest state.
+
+If T3 was enrolled, deregister the old environment from your T3 Connect account before rebuilding, or afterward if it has already been wiped. Removing it only from a device's connections does not deregister it. Proteus does not automate cloud cleanup. See [T3 Enrollment](./credentials.md#t3-code).
+
+After preserving anything you need, run:
 
 ```bash
 limactl stop proteus
@@ -79,6 +85,7 @@ limactl start proteus
 ./provision
 ./enroll github
 ./enroll claude
+./enroll t3
 limactl shell proteus
 ```
 
