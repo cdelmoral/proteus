@@ -75,7 +75,7 @@ if [[ "$tool" == t3 ]]; then
     exit 1
   fi
 
-  printf "Enrolled T3 in Lima instance '%s'. Local setup is verified; connect from another device to test remote access.\n" "$instance"
+  printf "Enrolled T3 in Lima instance '%s'. Authorization is saved and the background service is running; connect from another device to verify remote access.\n" "$instance"
   exit 0
 fi
 

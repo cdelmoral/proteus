@@ -1,17 +1,12 @@
 """Exercise real enrollment orchestration with simulated T3 and systemd tools."""
 
 from datetime import datetime, timezone
-from contextlib import redirect_stdout
-import importlib.machinery
-import importlib.util
-import io
 import json
 import os
 from pathlib import Path
 import pty
 import shutil
 import subprocess
-from unittest.mock import patch
 
 from test_enroll import EnrollmentHarness, ROOT
 
@@ -92,6 +87,7 @@ save()
 if os.environ.get('TEST_T3_LOGIN_FAIL'):
     sys.exit(1)
 state['authenticated'] = state['desired'] = True
+state['linked'] = not bool(os.environ.get('TEST_LINK_INCOMPLETE'))
 secrets = home / '.t3/userdata/secrets'
 secrets.mkdir(parents=True, exist_ok=True)
 (secrets / 'test-credential').write_text('guest-t3-session')
@@ -114,6 +110,8 @@ unit = home / '.config/systemd/user/t3code.service'
 unit.parent.mkdir(parents=True, exist_ok=True)
 unit.write_text('test-user-service')
 runtime = home / '.t3/userdata/server-runtime.json'
+if os.environ.get('TEST_NO_SERVER_RUNTIME'):
+    sys.exit(0)
 runtime.write_text(json.dumps({
     'version': 1, 'pid': int(os.environ['TEST_SERVER_PID']), 'serviceManaged': True,
     'startedAt': datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -272,88 +270,93 @@ runtime.write_text(json.dumps({
         self.assertIn("foreground T3 server", output)
         self.assertFalse(any("--headless" in call for call in self.tools()))
 
-    def test_linking_running_service_preserves_work_and_requires_restart(self):
+    def test_linking_running_service_preserves_work_and_completes_enrollment(self):
         _, runtime = self.seed_enrollment(desired=False, authenticated=False, linked=False)
         original_runtime = runtime.read_bytes()
         status, output = self.run_enroll("t3")
-        self.assertEqual(status, 1, output)
-        self.assertIn("t3 service restart", output)
+        self.assertEqual(status, 0, output)
+        self.assertIn("Enrolled T3", output)
         self.assertEqual(original_runtime, runtime.read_bytes())
         state = json.loads(self.state.read_text())
-        self.assertTrue(state["authenticated"] and state["desired"])
+        self.assertTrue(state["authenticated"] and state["desired"] and state["linked"])
         self.assertTrue(any(call[1:4] == ["connect", "link", "--headless"] for call in self.tools()))
 
-    def test_link_saved_after_startup_requires_restart(self):
+    def test_link_saved_after_startup_does_not_require_restart(self):
         desired, _ = self.seed_enrollment()
         os.utime(desired, (desired.stat().st_atime, desired.stat().st_mtime + 10))
         status, output = self.run_enroll("t3")
-        self.assertEqual(status, 1, output)
-        self.assertIn("t3 service restart", output)
+        self.assertEqual(status, 0, output)
+        self.assertIn("Enrolled T3", output)
         self.assertFalse(any("--headless" in call for call in self.tools()))
 
-    def test_publish_only_link_is_converted_without_restarting_service(self):
+    def test_saved_link_mode_is_owned_by_t3(self):
         desired, runtime = self.seed_enrollment()
         desired.write_bytes(b"publish_only")
         original_runtime = runtime.read_bytes()
         status, output = self.run_enroll("t3")
-        self.assertEqual(status, 1, output)
-        self.assertIn("t3 service restart", output)
-        self.assertEqual(desired.read_bytes(), b"managed")
+        self.assertEqual(status, 0, output)
+        self.assertEqual(desired.read_bytes(), b"publish_only")
         self.assertEqual(runtime.read_bytes(), original_runtime)
+        self.assertFalse(any("--headless" in call for call in self.tools()))
 
-    def test_other_data_directory_or_pending_update_is_left_alone(self):
+    def test_other_data_directory_is_left_alone(self):
         self.seed_enrollment()
         status, output = self.run_enroll("t3", TEST_OTHER_BASE="1")
         self.assertEqual(status, 1, output)
         self.assertIn("another data directory", output)
+        self.assertFalse(any("--headless" in call for call in self.tools()))
+
+    def test_pending_runtime_update_does_not_block_enrollment(self):
+        self.seed_enrollment()
         marker = self.guest / ".t3/runtime/.restart-pending"
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.touch()
         status, output = self.run_enroll("t3")
-        self.assertEqual(status, 1, output)
-        self.assertIn("update is pending", output)
+        self.assertEqual(status, 0, output)
+        self.assertTrue(marker.exists())
         self.assertFalse(any("--headless" in call for call in self.tools()))
 
     def test_unrecognized_runtime_state_cannot_trigger_onboarding(self):
-        _, runtime = self.seed_enrollment()
-        runtime.write_text(json.dumps({"version": 1, "pid": os.getpid(), "startedAt": 123}))
+        _, runtime = self.seed_enrollment(installed=False)
+        runtime.write_text(json.dumps({"version": 1, "pid": "invalid", "serviceManaged": False}))
         status, output = self.run_enroll("t3")
         self.assertEqual(status, 1, output)
         self.assertIn("safely identify", output)
         self.assertNotIn("Traceback", output)
         self.assertFalse(any("--headless" in call for call in self.tools()))
 
-    def test_incomplete_pinned_runtime_is_not_replaced(self):
+    def test_missing_pinned_runtime_metadata_does_not_block_healthy_service(self):
         self.seed_enrollment()
-        (self.guest / ".t3/runtime/versions/0.0.45/.install-complete").unlink()
+        shutil.rmtree(self.guest / ".t3/runtime")
         status, output = self.run_enroll("t3")
-        self.assertEqual(status, 1, output)
-        self.assertIn("runtime needs repair", output)
+        self.assertEqual(status, 0, output)
+        self.assertFalse((self.guest / ".t3/runtime").exists())
         self.assertFalse(any("--headless" in call for call in self.tools()))
 
+    def test_missing_private_link_and_server_files_do_not_block_healthy_service(self):
+        desired, runtime = self.seed_enrollment()
+        desired.unlink()
+        runtime.unlink()
+        status, output = self.run_enroll("t3")
+        self.assertEqual(status, 0, output)
+        self.assertFalse(any("--headless" in call for call in self.tools()))
 
-class StartupVerificationTest(EnrollmentHarness):
-    def test_pending_local_link_times_out_without_claiming_success(self):
-        loader = importlib.machinery.SourceFileLoader("proteus_enroll_t3", str(HELPER))
-        spec = importlib.util.spec_from_loader(loader.name, loader)
-        module = importlib.util.module_from_spec(spec)
-        loader.exec_module(module)
-        enrollment = module.Enrollment()
-        status = {"desired": True, "authenticated": True, "linked": False, "relayClient": {"status": "available"}}
-        with (
-            redirect_stdout(io.StringIO()),
-            patch.object(module.sys.stdin, "isatty", return_value=True),
-            patch.object(module.sys.stdout, "isatty", return_value=True),
-            patch.object(module.shutil, "which", return_value="/test/tool"),
-            patch.object(module, "read_command", return_value=type("Result", (), {"returncode": 0})()),
-            patch.object(enrollment, "service", side_effect=[None, None, {}, {}]),
-            patch.object(enrollment, "protect_server", return_value=None),
-            patch.object(enrollment, "ensure_lingering"),
-            patch.object(enrollment, "healthy_service", return_value=True),
-            patch.object(enrollment, "use_service_runtime"),
-            patch.object(enrollment, "t3", side_effect=[status, 0, status, status]),
-            patch.object(module.time, "monotonic", side_effect=[0, 0, module.STARTUP_TIMEOUT]),
-            patch.object(module.time, "sleep"),
-        ):
-            with self.assertRaisesRegex(module.Incomplete, "not completed local linking/startup"):
-                enrollment.run()
+    def test_fresh_enrollment_does_not_wait_for_server_runtime_file(self):
+        status, output = self.run_enroll("t3", TEST_NO_SERVER_RUNTIME="1")
+        self.assertEqual(status, 0, output)
+        self.assertIn("Enrolled T3", output)
+        self.assertNotIn("Verifying local T3 startup", output)
+
+    def test_missing_environment_link_reports_incomplete_configuration(self):
+        status, output = self.run_enroll("t3", TEST_LINK_DELAYED="1")
+        self.assertEqual(status, 1, output)
+        self.assertIn("environment linking is incomplete", output)
+        self.assertNotIn("Enrolled T3", output)
+
+    def test_failed_linking_running_service_preserves_work(self):
+        _, runtime = self.seed_enrollment(desired=False, authenticated=False, linked=False)
+        original_runtime = runtime.read_bytes()
+        status, output = self.run_enroll("t3", TEST_LINK_INCOMPLETE="1")
+        self.assertEqual(status, 1, output)
+        self.assertIn("environment linking is incomplete", output)
+        self.assertEqual(runtime.read_bytes(), original_runtime)
