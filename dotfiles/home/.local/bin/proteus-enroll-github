@@ -34,10 +34,5 @@ if ! GH_TOKEN="$token" gh auth status --hostname github.com >/dev/null 2>&1; the
   exit 1
 fi
 
-if ! GH_TOKEN="$token" gh auth setup-git --hostname github.com --force >/dev/null 2>&1; then
-  printf 'GitHub CLI could not configure Git for github.com. The installed credential was not changed.\n' >&2
-  exit 1
-fi
-
 mv "$temporary_file" "$token_file"
 trap - EXIT
