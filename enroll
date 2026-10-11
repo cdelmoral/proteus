@@ -111,7 +111,7 @@ fi
 # HOME must expand in the guest.
 # shellcheck disable=SC2016
 if ! limactl shell --tty=false "$instance" sh -c \
-  'test -x "$HOME/.local/bin/proteus-enroll-github" && test -x "$HOME/.local/bin/proteus-git-credential-github" && command -v gh >/dev/null' >/dev/null 2>&1; then
+  'test -x "$HOME/.local/bin/proteus-enroll-github" && test -x "$HOME/.local/bin/proteus-git-credential-github" && test -x "$HOME/.local/bin/gh" && command -v gh >/dev/null' >/dev/null 2>&1; then
   printf "Lima instance '%s' has not been provisioned with GitHub Credential Enrollment. Run ./provision first.\n" "$instance" >&2
   exit 1
 fi
@@ -125,4 +125,4 @@ if ! op read "$reference" |
   exit 1
 fi
 
-printf "Enrolled the GitHub credential in Lima instance '%s'. Git HTTPS access is ready; open a new interactive guest shell for GitHub CLI commands.\n" "$instance"
+printf "Enrolled the GitHub credential in Lima instance '%s'. Git HTTPS and GitHub CLI access are ready.\n" "$instance"
