@@ -207,11 +207,10 @@ print('test-github-token')
         self.write_command(self.bin / "gh", """
 import os, sys
 assert os.environ['GH_TOKEN'] == 'test-github-token'
-assert sys.argv[1:] in (['auth', 'status', '--hostname', 'github.com'],
-                         ['auth', 'setup-git', '--hostname', 'github.com', '--force'])
+assert sys.argv[1:] == ['auth', 'status', '--hostname', 'github.com']
 sys.exit(1 if os.environ.get('TEST_STATUS_FAIL') else 0)
 """)
-        for relative in (".local/bin/proteus-enroll-github", ".local/lib/proteus/credentials.sh"):
+        for relative in (".local/bin/proteus-enroll-github", ".local/bin/proteus-git-credential-github", ".local/lib/proteus/credentials.sh"):
             destination = self.guest / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / "dotfiles/home" / relative, destination)

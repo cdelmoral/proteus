@@ -1,6 +1,5 @@
 [core]
 	pager = delta
-	commentChar = ;
 [interactive]
 	diffFilter = delta --color-only
 [delta]
@@ -19,5 +18,11 @@
 	cmd = nvim -c \"DiffviewOpen\"
 [alias]
 	lg = log --oneline --graph --decorate --all
+[credential "https://github.com"]
+	helper =
+	helper = "!\"$HOME/.local/bin/proteus-git-credential-github\""
+[credential "https://gist.github.com"]
+	helper =
+	helper = "!\"$HOME/.local/bin/proteus-git-credential-github\""
 [include]
 	path = ~/.gitconfig.local
