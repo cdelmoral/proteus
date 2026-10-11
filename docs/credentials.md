@@ -17,9 +17,11 @@ The guest validates the token before atomically replacing `~/.local/share/proteu
 
 Managed Dotfiles configure Git's HTTPS credential helper for `github.com` and `gist.github.com`. The helper reads the enrolled token each time Git requests credentials and passes it to a GitHub CLI subprocess. HTTPS Git operations work in interactive shells, non-interactive commands, and background services such as T3 without requiring `GH_TOKEN` in their environment. Enrollment does not rewrite Managed Dotfiles, so repeating Provisioning preserves this configuration. Token replacement takes effect on the next Git operation without restarting a service.
 
-New interactive Bash sessions also read the file and export `GH_TOKEN` for direct GitHub CLI commands. Proteus does not export it system-wide or into a service's environment. The guest's primary user and guest root can read the installed token.
+Managed Dotfiles also install a `gh` launcher, exposed through `/usr/local/bin/gh` so background services can find it on the normal system PATH. When neither `GH_TOKEN` nor `GITHUB_TOKEN` is set, the launcher reads the enrolled token and passes it to the packaged `/usr/bin/gh` executable. Each invocation reads the current credential, so background GitHub CLI commands work immediately after enrollment or token replacement without restarting T3. Explicit environment tokens take precedence; with no enrolled token, normal GitHub CLI behavior is preserved.
 
-If T3 reports `could not read Username for 'https://github.com': terminal prompts disabled` after switching to its background service, apply the updated Managed Dotfiles with `./provision` from macOS. Run `./enroll github` if the guest has not enrolled its GitHub token, then retry the clone in T3. No T3 service restart is required.
+New interactive Bash sessions continue to read the file and export `GH_TOKEN`. Proteus does not export it system-wide or into a service's environment; the launcher supplies it only to the GitHub CLI process. The guest's primary user and guest root can read the installed token. Calling `/usr/bin/gh` directly bypasses the launcher.
+
+If Git or GitHub CLI commands in T3 cannot authenticate after switching to its background service, apply the updated Managed Dotfiles and launcher with `./provision` from macOS. Run `./enroll github` if the guest has not enrolled its GitHub token, then retry the command in T3. No T3 service restart is required.
 
 The guest receives only this selected Host-Injected Credential. It cannot invoke 1Password, browse the vault, or retrieve another host credential. Continue to create AWS, cloud, OpenCode, T3 Code, and other credentials inside the guest only when needed.
 

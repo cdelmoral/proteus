@@ -14,7 +14,7 @@ The VM Definition creates Proteus as a Credential-Isolated Dev VM:
 
 Provisioning runs from macOS through Lima's generated SSH configuration. This connection lets Ansible apply the Development Baseline without giving the guest access to macOS credentials. GitHub Credential Enrollment is a separate host command that sends one token through standard input after 1Password resolves its configured reference. The guest cannot invoke 1Password or access unrelated host credentials.
 
-The installed GitHub token is readable by the guest user and guest root. Processes launched from a new interactive Bash session inherit it as `GH_TOKEN`. Git's managed GitHub credential helper also reads the token when needed, allowing HTTPS Git operations from background services without exporting it into the service's environment. This boundary protects the host credential store and ambient host credentials, not a credential deliberately installed in the guest. See the [Credential Enrollment guide](../docs/credentials.md) for the enrollment procedure.
+The installed GitHub token is readable by the guest user and guest root. Processes launched from a new interactive Bash session inherit it as `GH_TOKEN`. Git's managed GitHub credential helper and the managed `gh` launcher also read the token when needed, allowing HTTPS Git and GitHub CLI commands from background services without exporting it into the service's environment. This boundary protects the host credential store and ambient host credentials, not a credential deliberately installed in the guest. See the [Credential Enrollment guide](../docs/credentials.md) for the enrollment procedure.
 
 ## Docker risk
 
