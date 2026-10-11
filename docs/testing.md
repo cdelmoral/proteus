@@ -4,7 +4,7 @@ Run these commands from the repository root.
 
 ## Automated checks
 
-Run `make static test` to validate Provisioning and the VM Definition and exercise enrollment with simulated CLI tools. The enrollment tests use separate host and guest homes and a real terminal without contacting 1Password, Claude, or T3 Connect. T3 tests simulate systemd, lingering, and provider-independent Connect setup, including partial failures, retries, and existing-server protection. They verify completion from saved Connect configuration and systemd persistence, including links saved after startup and healthy services without private runtime metadata. GitHub credential tests require Git and GitHub CLI and exercise real Git credential lookup with dummy tokens, without network access. They cover background-service environments, reprovisioning, token rotation, and missing credentials.
+Run `make static test` to validate Provisioning and the VM Definition and exercise enrollment with simulated CLI tools. The enrollment tests use separate host and guest homes and a real terminal without contacting 1Password, Claude, or T3 Connect. T3 tests simulate systemd, lingering, and provider-independent Connect setup, including partial failures, retries, and existing-server protection. They verify completion from saved Connect configuration and systemd persistence, including links saved after startup and healthy services without private runtime metadata. GitHub credential tests require Git and GitHub CLI and exercise real credential lookup with dummy tokens, without network access. They cover background Git and `gh` commands on the system PATH, reprovisioning, token rotation, explicit environment overrides, rejected replacement tokens, and missing credentials.
 
 ## Manual acceptance
 
@@ -18,7 +18,7 @@ The check validates the production VM Definition, creates and starts a uniquely 
 
 The check refuses to adopt an existing instance and deletes the VM it created after success or failure. It disables development-port forwarding for that VM, so the normal `proteus` instance may remain running.
 
-To verify GitHub Credential Enrollment manually on macOS, create and start a fresh VM, run `./provision`, run `./enroll github`, and enter a new guest shell. Confirm `gh auth status` and one HTTPS Git operation succeed. Repeat the Git operation through a non-interactive guest command with `GH_TOKEN` and `GITHUB_TOKEN` unset, and again after Provisioning. Confirm a private project clone through T3's background service succeeds. Do not print or inspect the token.
+To verify GitHub Credential Enrollment manually on macOS, create and start a fresh VM, run `./provision`, run `./enroll github`, and enter a new guest shell. Confirm `gh auth status` and one HTTPS Git operation succeed. Repeat the Git operation and `gh api user --silent` through non-interactive guest commands with `GH_TOKEN` and `GITHUB_TOKEN` unset, and again after Provisioning. Confirm both a private project clone and a GitHub CLI command through T3's background service succeed. Do not print or inspect the token.
 
 Run `./enroll claude` from an interactive terminal, complete browser authorization, and confirm `claude auth status` succeeds inside the guest. Stop and start the VM to confirm the login persists. Repeat enrollment after a rebuild.
 

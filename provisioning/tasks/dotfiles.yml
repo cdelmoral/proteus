@@ -72,3 +72,11 @@
       - "{{ ansible_user_dir }}"
       - home
   changed_when: true
+
+- name: Expose the GitHub CLI wrapper on the system executable path
+  ansible.builtin.file:
+    src: "{{ ansible_user_dir }}/.local/bin/gh"
+    dest: /usr/local/bin/gh
+    state: link
+    force: true
+  become: true

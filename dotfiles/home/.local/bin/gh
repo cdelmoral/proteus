@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Preserve tokens supplied by callers, including enrollment's candidate token.
+# Services without an inherited token use the current enrolled credential.
+if [[ -z "${GH_TOKEN:-}" && -z "${GITHUB_TOKEN:-}" &&
+      -r "$HOME/.local/lib/proteus/credentials.sh" ]]; then
+  # shellcheck source=dotfiles/home/.local/lib/proteus/credentials.sh
+  source "$HOME/.local/lib/proteus/credentials.sh"
+  token_file="$(proteus_github_token_file)"
+  if [[ -r "$token_file" ]]; then
+    GH_TOKEN="$(<"$token_file")"
+    export GH_TOKEN
+  fi
+fi
+
+# Use the apt-installed executable directly so the wrapper cannot recurse.
+exec /usr/bin/gh "$@"
