@@ -15,6 +15,7 @@
     - "{{ ansible_user_dir }}/.config/mise"
     - "{{ ansible_user_dir }}/.local/bin"
     - "{{ mise_install_dir }}"
+    - "{{ salesforce_cli_dir }}"
 
 - name: Download the pinned mise binary
   ansible.builtin.get_url:
@@ -111,10 +112,17 @@
 - name: Link the npm package commands
   ansible.builtin.file:
     src: "{{ managed_node.stdout | trim }}/bin/{{ item.command }}"
-    dest: "{{ ansible_user_dir }}/.local/bin/{{ item.command }}"
+    dest: "{{ item.link | default(ansible_user_dir ~ '/.local/bin/' ~ item.command) }}"
     state: link
     force: true
   loop: "{{ development_npm_packages }}"
+
+- name: Link the managed Node runtime for the Salesforce CLI launcher
+  ansible.builtin.file:
+    src: "{{ managed_node.stdout | trim }}/bin/node"
+    dest: "{{ salesforce_cli_dir }}/node"
+    state: link
+    force: true
 
 - name: Read the registered Claude Code marketplaces
   ansible.builtin.command:
