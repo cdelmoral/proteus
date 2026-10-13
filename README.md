@@ -4,14 +4,14 @@ Proteus is a Rebuildable Dev VM for personal development on Apple silicon Macs, 
 
 ## Quick start
 
-On an Apple silicon Mac with [Homebrew](https://brew.sh/), run these commands from the repository root in an interactive macOS terminal. Proteus requires Lima 2.2 or later. For GitHub enrollment, have a fine-grained personal access token stored in 1Password and enter its field's secret reference when `./configure` prompts you.
+On an Apple silicon Mac with [Homebrew](https://brew.sh/), run these commands from the repository root in an interactive macOS terminal. Proteus requires Lima 2.2 or later. For GitHub enrollment, have a fine-grained personal access token stored in 1Password and enter its field's secret reference when `./configure` prompts you. At its Salesforce login URL prompt, press Enter unless your org requires its My Domain URL.
 
 ```bash
 # Install host tools
 brew install lima ansible
 brew install --cask 1password-cli
 
-# Configure the 1Password reference for your GitHub token
+# Configure the 1Password reference for your GitHub token and your Salesforce login URL
 ./configure
 
 # Create, start, and provision the VM

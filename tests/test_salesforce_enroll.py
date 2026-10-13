@@ -20,6 +20,9 @@ GUEST_FILES = (
 CLI = ".local/share/proteus/salesforce-cli/sf"
 NODE = ".local/share/proteus/salesforce-cli/node"
 TOKEN = "sensitive-access-token"
+DEFAULT_URL = "https://login.salesforce.com"
+MY_DOMAIN = "https://example.my.salesforce.com"
+REFERENCE = "op://test/GitHub/token"
 
 
 class SalesforceEnrollmentTest(EnrollmentHarness):
@@ -66,6 +69,21 @@ elif args == ['org', 'display', '--target-org', 'devhub', '--json']:
 else:
     sys.exit(92)
 """)
+
+    @property
+    def configuration(self):
+        return Path(self.environment["XDG_CONFIG_HOME"]) / "proteus/config"
+
+    def configure(self, *answers):
+        result = subprocess.run(
+            [str(ROOT / "configure")], input="".join(f"{answer}\n" for answer in answers),
+            env=self.environment, capture_output=True, text=True, timeout=10,
+        )
+        return result.returncode, result.stdout + result.stderr
+
+    def login_url(self):
+        login = self.logins()[-1]["args"]
+        return login[login.index("--instance-url") + 1]
 
     def cli_calls(self):
         return [json.loads(line) for line in self.cli_log.read_text().splitlines()] if self.cli_log.exists() else []
@@ -156,6 +174,70 @@ else:
                 self.assertNotIn("Enrolled", output)
                 self.assertIn("Salesforce Credential Enrollment failed", output)
                 self.assertNotIn(TOKEN, output)
+
+    def test_configured_my_domain_reaches_login(self):
+        status, output = self.configure(REFERENCE, MY_DOMAIN)
+        self.assertEqual(status, 0, output)
+        status, output = self.run_enroll("salesforce")
+        self.assertEqual(status, 0, output)
+        self.assertEqual(self.login_url(), MY_DOMAIN)
+        self.assertIn(MY_DOMAIN + "/services/oauth2/authorize", output)
+
+    def test_pasted_trailing_slash_is_saved_without_path(self):
+        status, output = self.configure(REFERENCE, MY_DOMAIN + "/")
+        self.assertEqual(status, 0, output)
+        self.assertIn(f"salesforce_login_url={MY_DOMAIN}\n", self.configuration.read_text())
+
+    def test_configuration_without_login_url_uses_standard_login(self):
+        self.configuration.parent.mkdir(parents=True)
+        self.configuration.write_text(f"github_token_1password_reference={REFERENCE}\n")
+        status, output = self.run_enroll("salesforce")
+        self.assertEqual(status, 0, output)
+        self.assertEqual(self.login_url(), DEFAULT_URL)
+
+    def test_blank_answers_keep_current_values_or_defaults(self):
+        status, output = self.configure(REFERENCE, "")
+        self.assertEqual(status, 0, output)
+        self.assertIn(f"[{DEFAULT_URL}]", output)
+        self.assertEqual(self.configure(REFERENCE, MY_DOMAIN)[0], 0)
+        saved = self.configuration.read_text()
+        status, output = self.configure("", "")
+        self.assertEqual(status, 0, output)
+        self.assertIn(f"[{REFERENCE}]", output)
+        self.assertIn(f"[{MY_DOMAIN}]", output)
+        self.assertEqual(self.configuration.read_text(), saved)
+
+    def test_saving_either_value_preserves_the_other(self):
+        self.assertEqual(self.configure(REFERENCE, MY_DOMAIN)[0], 0)
+        self.assertEqual(self.configure("op://test/GitHub/rotated", "")[0], 0)
+        self.assertEqual(self.configure("", "https://other.my.salesforce.com")[0], 0)
+        self.assertEqual(sorted(self.configuration.read_text().splitlines()), [
+            "github_token_1password_reference=op://test/GitHub/rotated",
+            "salesforce_login_url=https://other.my.salesforce.com",
+        ])
+
+    def test_github_reference_is_still_required(self):
+        status, output = self.configure("", MY_DOMAIN)
+        self.assertEqual(status, 1, output)
+        self.assertIn("reference is required", output)
+        self.assertFalse(self.configuration.exists())
+
+    def test_invalid_login_urls_leave_configuration_unchanged(self):
+        self.assertEqual(self.configure(REFERENCE, MY_DOMAIN)[0], 0)
+        saved = self.configuration.read_bytes()
+        for url in (
+            "http://login.salesforce.com", "login.salesforce.com",
+            "https://login.salesforce.com/path", "https://login.salesforce.com?next=x",
+            "https://login.salesforce.com#fragment", "https://salesforce.com",
+            "https://example.com", "https://login.salesforce.com.example.com",
+            "https://examplesalesforce.com", "https://user@login.salesforce.com",
+            "https://login.salesforce.com:8443",
+        ):
+            with self.subTest(url=url):
+                status, output = self.configure("op://test/GitHub/rotated", url)
+                self.assertEqual(status, 1, output)
+                self.assertIn("Salesforce login URL", output)
+                self.assertEqual(self.configuration.read_bytes(), saved)
 
 
 if __name__ == "__main__":
