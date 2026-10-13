@@ -46,6 +46,12 @@ development_npm_packages:
     command: opencode
   - package: t3
     command: t3
+  # The Managed Dotfiles sf launcher runs this link with fixed settings.
+  - package: "@salesforce/cli"
+    command: sf
+    link: "{{ salesforce_cli_dir }}/sf"
+
+salesforce_cli_dir: "{{ ansible_user_dir }}/.local/share/proteus/salesforce-cli"
 
 managed_dotfiles_dir: "{{ ansible_user_dir }}/.local/share/proteus/dotfiles"
 
