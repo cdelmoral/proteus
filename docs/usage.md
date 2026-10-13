@@ -33,6 +33,8 @@ Enter the field's 1Password secret reference when prompted. Proteus stores the r
 
 The `op` command is not needed while configuring the reference. It is required later when Credential Enrollment resolves that reference.
 
+`./configure` then asks for the Salesforce login URL used by `./enroll salesforce`. Press Enter to keep the value shown, which is `https://login.salesforce.com` until you save another. Enter your org's My Domain URL, such as `https://example.my.salesforce.com`, if it requires one. The URL must use `https://`, have a host ending in `.salesforce.com`, and have no path, query, or fragment; a trailing slash is removed. An invalid URL fails without changing the saved configuration. Saving either value preserves the other, and the GitHub reference remains required. If no Salesforce login URL is saved, including in configuration written before this prompt existed, enrollment uses `https://login.salesforce.com`.
+
 ## Operating workflow
 
 Run these commands from the repository root. Lima owns the VM lifecycle; Provisioning never creates, starts, stops, or deletes a VM.
