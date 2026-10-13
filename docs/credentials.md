@@ -23,7 +23,7 @@ New interactive Bash sessions continue to read the file and export `GH_TOKEN`. P
 
 If Git or GitHub CLI commands in T3 cannot authenticate after switching to its background service, apply the updated Managed Dotfiles and launcher with `./provision` from macOS. Run `./enroll github` if the guest has not enrolled its GitHub token, then retry the command in T3. No T3 service restart is required.
 
-The guest receives only this selected Host-Injected Credential. It cannot invoke 1Password, browse the vault, or retrieve another host credential. Continue to create AWS, cloud, OpenCode, T3 Code, and other credentials inside the guest only when needed.
+The guest receives only this selected Host-Injected Credential. It cannot invoke 1Password, browse the vault, or retrieve another host credential. Continue to create AWS, cloud, OpenCode, T3 Code, Salesforce, and other credentials inside the guest only when needed.
 
 ## Claude Code
 
@@ -70,5 +70,35 @@ Provisioning updates the npm CLI without updating or restarting an enrolled serv
 Deleting the VM removes its local credentials and service. Before a rebuild, deregister its old environment through the account's T3 Connect page; you can also deregister an already wiped environment. Forgetting it in a device's connection list is insufficient. Enroll the replacement VM afresh; Proteus does not automate cloud deregistration.
 
 The helper expects the `desired`, `authenticated`, and `linked` boolean fields from T3 Connect status. It uses the guest's `T3CODE_HOME`, or `~/.t3` by default, and refuses to replace an existing service configured for another data directory. Run recovery commands with the same data directory when using a custom one.
+
+## Salesforce
+
+After Provisioning, run this command from an interactive macOS terminal:
+
+```bash
+./enroll salesforce
+```
+
+Enrollment authorizes the Dev Hub User, whose minimal permissions allow only scratch org management through Dev Hub. [ADR 0004](./adr/0004-allow-dev-hub-user-credential.md) records why this is the only production Salesforce identity Proteus may hold.
+
+Proteus runs `sf org login web --instance-url https://login.salesforce.com --alias devhub --set-default-dev-hub` inside the guest. The guest has no browser, so Proteus captures Salesforce CLI's authorization URL and prints it. Open it in your macOS browser, log in as the Dev Hub User, complete any MFA or login challenges, and approve access. The browser's redirect to `localhost:1717` reaches Salesforce CLI's callback server in the guest through the VM Definition's port forward. Port 1717 must be free on the Mac while enrollment runs, so do not run another Salesforce CLI web login on the Mac at the same time.
+
+Enrollment requires terminal input and output; piping input or redirecting output fails before login starts. It does not need 1Password or a configured GitHub credential source. The selected instance must already be running and provisioned with Salesforce CLI. Enrollment never starts or provisions it. Proteus reports success only after Salesforce CLI reports the `devhub` authorization as connected. Every run performs a fresh browser login and replaces the saved authorization, so run `./enroll salesforce` again to recover from a revoked or expired login.
+
+The resulting Dev Hub User credential is a VM-Local Credential. Salesforce CLI stores it in its file-based keychain inside the guest; Proteus does not store any Salesforce token on macOS or in 1Password. It persists across VM stops and is removed when the VM is deleted. Because the managed `sf` launcher is on the system PATH and always selects the file-based keychain, interactive shells and background services such as T3 use the same authorization.
+
+`devhub` is the global default Dev Hub, so scratch org commands work without `--target-dev-hub`:
+
+```bash
+sf org create scratch --definition-file config/project-scratch-def.json --alias my-scratch
+```
+
+Salesforce CLI authorizes each new scratch org inside the guest from the Dev Hub User's authorization, without a browser or another enrollment. To open an org from the guest, print its login URL and open the link on macOS:
+
+```bash
+sf org open --target-org my-scratch --url-only
+```
+
+`sf org logout` removes only the guest-local authorization; it does not revoke the OAuth token in Salesforce. Before deleting the VM, delete scratch orgs you no longer need with `sf org delete scratch`, then revoke the VM's Salesforce CLI access in the Dev Hub User's personal settings under OAuth Connected Apps. See [rebuilding Proteus](./usage.md#rebuild-proteus).
 
 See [host configuration](./usage.md#host-configuration) to select the GitHub token source, and [VM details](../vm/README.md#isolation-boundary) for the isolation boundary.

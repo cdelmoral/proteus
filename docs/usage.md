@@ -45,6 +45,7 @@ Run these commands from the repository root. Lima owns the VM lifecycle; Provisi
 | Enroll the configured GitHub credential | `./enroll github` |
 | Authorize Claude Code inside the guest | `./enroll claude` |
 | Authorize T3 Connect and install its persistent guest service | `./enroll t3` |
+| Authorize the Salesforce Dev Hub User inside the guest | `./enroll salesforce` |
 | Open a guest shell | `limactl shell proteus` |
 | Stop Proteus | `limactl stop proteus` |
 | Delete a stopped Proteus VM | `limactl delete proteus` |
@@ -58,6 +59,7 @@ Create, start, and provision the VM before first use. On later days, start it an
 ./enroll github proteus-acceptance-example
 ./enroll claude proteus-acceptance-example
 ./enroll t3 proteus-acceptance-example
+./enroll salesforce proteus-acceptance-example
 ```
 
 ## Git identity
@@ -75,6 +77,8 @@ Deleting Proteus permanently removes its repositories, uncommitted work, VM-Loca
 
 If T3 was enrolled, deregister the old environment from your T3 Connect account before rebuilding, or afterward if it has already been wiped. Removing it only from a device's connections does not deregister it. Proteus does not automate cloud cleanup. See [T3 Enrollment](./credentials.md#t3-code).
 
+If Salesforce was enrolled, delete scratch orgs you no longer need with `sf org delete scratch`, then revoke the VM's Salesforce CLI access in the Dev Hub User's personal settings under OAuth Connected Apps before deleting the VM. `sf org logout` only removes the guest-local authorization, so no valid production-org token should outlive the VM. See [Salesforce enrollment](./credentials.md#salesforce).
+
 After preserving anything you need, run:
 
 ```bash
@@ -86,6 +90,7 @@ limactl start proteus
 ./enroll github
 ./enroll claude
 ./enroll t3
+./enroll salesforce
 limactl shell proteus
 ```
 

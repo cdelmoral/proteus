@@ -36,6 +36,10 @@ _Avoid_: Shared credential, forwarded credential
 An AWS role that can change, deploy, delete, or expose production infrastructure or data.
 _Avoid_: Prod access, live credentials
 
+**Dev Hub User**:
+A dedicated Salesforce user in the production org whose minimal permissions allow only scratch org management through Dev Hub. It is the only production Salesforce identity Proteus may hold.
+_Avoid_: Dev Hub account, integration user, production Salesforce user
+
 **VM Definition**:
 The Lima configuration that creates Proteus and establishes its credential-isolation boundary.
 _Avoid_: Provisioning, VM configuration

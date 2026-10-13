@@ -7,10 +7,11 @@ readonly script_dir
 source "${script_dir}/lib/config.sh"
 
 usage() {
-  printf 'Usage: %s {github|claude|t3} [instance-name]\n' "${0##*/}" >&2
+  printf 'Usage: %s {github|claude|t3|salesforce} [instance-name]\n' "${0##*/}" >&2
 }
 
-if [[ $# -lt 1 || $# -gt 2 || ( "$1" != github && "$1" != claude && "$1" != t3 ) ||
+if [[ $# -lt 1 || $# -gt 2 ||
+  ( "$1" != github && "$1" != claude && "$1" != t3 && "$1" != salesforce ) ||
   ( $# -eq 2 && ( -z "$2" || "$2" == -* ) ) ]]; then
   usage
   exit 2
@@ -37,6 +38,8 @@ if [[ "$tool" == github ]]; then
 elif [[ ! -t 0 || ! -t 1 ]]; then
   if [[ "$tool" == t3 ]]; then
     printf 'T3 Enrollment requires an interactive terminal for input and output.\n' >&2
+  elif [[ "$tool" == salesforce ]]; then
+    printf 'Salesforce Credential Enrollment requires an interactive terminal for input and output.\n' >&2
   else
     printf 'Claude Code Credential Enrollment requires an interactive terminal for input and output.\n' >&2
   fi
@@ -76,6 +79,28 @@ if [[ "$tool" == t3 ]]; then
   fi
 
   printf "Enrolled T3 in Lima instance '%s'. Authorization is saved and the background service is running; connect from another device to verify remote access.\n" "$instance"
+  exit 0
+fi
+
+if [[ "$tool" == salesforce ]]; then
+  readonly salesforce_login_url='https://login.salesforce.com'
+
+  # HOME must expand in the guest. The helper owns login and verification.
+  # shellcheck disable=SC2016
+  if ! limactl shell --tty=false --start=false "$instance" sh -c \
+    'test -x "$HOME/.local/bin/sf" && test -x "$HOME/.local/share/proteus/salesforce-cli/sf" && test -x "$HOME/.local/share/proteus/salesforce-cli/node" && test -x "$HOME/.local/bin/proteus-enroll-salesforce" && test -x "$HOME/.local/bin/proteus-capture-browser-url" && command -v python3 >/dev/null' >/dev/null 2>&1; then
+    printf "Lima instance '%s' has not been provisioned with Salesforce CLI. Run ./provision first.\n" "$instance" >&2
+    exit 1
+  fi
+
+  # shellcheck disable=SC2016
+  if ! limactl shell --tty=true --start=false "$instance" sh -c \
+    'exec "$HOME/.local/bin/proteus-enroll-salesforce" "$1"' sh "$salesforce_login_url"; then
+    printf "Salesforce Credential Enrollment failed for Lima instance '%s'.\n" "$instance" >&2
+    exit 1
+  fi
+
+  printf "Enrolled the Dev Hub User in Lima instance '%s'. Salesforce CLI uses it as the default Dev Hub with the alias devhub.\n" "$instance"
   exit 0
 fi
 
