@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Background services cannot use secret-tool, which Salesforce CLI otherwise
+# selects whenever it is installed. Keep the guest's production-org
+# credential out of usage data.
+export SF_USE_GENERIC_UNIX_KEYCHAIN=true
+export SF_DISABLE_TELEMETRY=true
+
+# Provisioning links the managed Node runtime beside the npm-installed CLI,
+# so a project's mise configuration cannot select another Node. Run the CLI
+# by absolute path so the launcher cannot recurse.
+readonly cli_dir="$HOME/.local/share/proteus/salesforce-cli"
+export PATH="${cli_dir}:${PATH}"
+exec "${cli_dir}/node" "${cli_dir}/sf" "$@"
