@@ -83,7 +83,13 @@ if [[ "$tool" == t3 ]]; then
 fi
 
 if [[ "$tool" == salesforce ]]; then
-  readonly salesforce_login_url='https://login.salesforce.com'
+  salesforce_login_url="$(proteus_salesforce_login_url)"
+  readonly salesforce_login_url
+
+  if ! proteus_valid_salesforce_login_url "$salesforce_login_url"; then
+    printf 'The configured Salesforce login URL is invalid. Run ./configure to correct it.\n' >&2
+    exit 1
+  fi
 
   # HOME must expand in the guest. The helper owns login and verification.
   # shellcheck disable=SC2016
