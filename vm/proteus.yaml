@@ -48,6 +48,10 @@ portForwards:
   - guestPort: 8080
     hostPort: 8080
     hostIP: "127.0.0.1"
+  # Salesforce CLI's OAuth callback during ./enroll salesforce.
+  - guestPort: 1717
+    hostPort: 1717
+    hostIP: "127.0.0.1"
 
 # Ubuntu 26.04 cloud images can otherwise wait on a renamed network interface.
 param:
@@ -62,6 +66,9 @@ message: |
   Enter the VM:
     limactl shell proteus
 
-  Run GitHub Credential Enrollment from macOS, then enter the VM:
+  Run Credential Enrollment from macOS for the tools you use, then enter the VM:
     ./enroll github
+    ./enroll claude
+    ./enroll t3
+    ./enroll salesforce
     limactl shell proteus

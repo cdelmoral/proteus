@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Used as BROWSER during Salesforce enrollment. Without a display, xdg-open
+# hands the authorization URL to BROWSER and discards its output, so record
+# the URL in the private file named by the enrollment helper instead.
+if [[ $# -ne 1 || -z "${PROTEUS_BROWSER_URL_FILE:-}" ]]; then
+  exit 1
+fi
+
+printf '%s\n' "$1" >"$PROTEUS_BROWSER_URL_FILE"
