@@ -13,7 +13,7 @@ if [[ -n "$current_reference" ]]; then
 else
   printf 'GitHub token 1Password secret reference: '
 fi
-IFS= read -r reference
+IFS= read -r reference || true
 reference="${reference:-$current_reference}"
 
 if [[ -z "$reference" ]]; then
@@ -21,6 +21,20 @@ if [[ -z "$reference" ]]; then
   exit 1
 fi
 
-config_file="$(proteus_save_github_reference "$reference")"
+current_login_url="$(proteus_salesforce_login_url)"
 
-printf 'Saved GitHub credential source to %s.\n' "$config_file"
+printf 'Salesforce login URL [%s]: ' "$current_login_url"
+IFS= read -r login_url || true
+login_url="${login_url:-$current_login_url}"
+# Accept a pasted trailing slash; the saved URL has no path.
+login_url="${login_url%/}"
+
+if ! proteus_valid_salesforce_login_url "$login_url"; then
+  printf 'The Salesforce login URL must be an https:// salesforce.com address with no path, such as %s or https://example.my.salesforce.com.\n' \
+    "$proteus_default_salesforce_login_url" >&2
+  exit 1
+fi
+
+config_file="$(proteus_save_config "$reference" "$login_url")"
+
+printf 'Saved the GitHub credential source and Salesforce login URL to %s.\n' "$config_file"
