@@ -20,7 +20,7 @@ The installed GitHub token is readable by the guest user and guest root. Process
 
 Provisioning adds the VM user to the `docker` group. This permits Docker commands without `sudo`, but it also grants root-level control inside the VM.
 
-Proteus is a single-user VM and must not assume a Production AWS Role under this security model. Revisit the design if the VM becomes multi-user, stores sensitive data, or needs a Production AWS Role.
+Proteus is a single-user VM and must not assume a Production AWS Role under this security model. The only production Salesforce identity it may hold is a Dev Hub User credential, enrolled with `./enroll salesforce` so scratch orgs can be created; see [ADR 0004](../docs/adr/0004-allow-dev-hub-user-credential.md). This exception does not relax the Production AWS Role rule. Revisit the design if the VM becomes multi-user, stores sensitive data, or needs a Production AWS Role.
 
 ## Ports
 
@@ -30,6 +30,9 @@ The VM Definition forwards these guest ports to localhost on the Mac:
 - `127.0.0.1:5173`
 - `127.0.0.1:8000`
 - `127.0.0.1:8080`
+- `127.0.0.1:1717`, Salesforce CLI's OAuth callback, which is only listened on during `./enroll salesforce`
+
+Lima also automatically forwards other TCP ports that guest processes listen on to the same port on host localhost. The explicit rules keep the ports above forwarded regardless of that default.
 
 To expose one port to selected devices on the local network, stop Proteus and change that port's `hostIP` in `vm/proteus.yaml` to `"0.0.0.0"`:
 

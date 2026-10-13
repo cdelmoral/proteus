@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+"""Authorize the Dev Hub User through Salesforce CLI's web login.
+
+Without a guest browser, the authorization URL is captured and opened on
+macOS. The OAuth callback reaches the guest through the VM Definition's
+1717 port forward. Completion requires Salesforce CLI to report the devhub
+authorization as connected. Status output and credentials are never printed.
+"""
+
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import time
+
+
+ALIAS = "devhub"
+URL_TIMEOUT = 60
+
+
+class Incomplete(Exception):
+    """An actionable enrollment failure."""
+
+
+def wait_for_url(login, url_file):
+    deadline = time.monotonic() + URL_TIMEOUT
+    while time.monotonic() < deadline:
+        # The capture script writes the URL and a newline in one write.
+        url = url_file.read_text() if url_file.exists() else ""
+        if url.endswith("\n"):
+            return url.strip()
+        if login.poll() is not None:
+            raise Incomplete("Salesforce CLI did not start browser login.")
+        time.sleep(0.1)
+    raise Incomplete("Salesforce CLI did not provide an authorization URL.")
+
+
+def enroll(instance_url):
+    bin_dir = Path.home() / ".local/bin"
+    sf = str(bin_dir / "sf")
+    # Container mode disables web login.
+    environment = {
+        name: value for name, value in os.environ.items()
+        if name not in ("SF_CONTAINER_MODE", "SFDX_CONTAINER_MODE")
+    }
+    with tempfile.TemporaryDirectory(prefix="proteus-salesforce-") as directory:
+        url_file = Path(directory) / "authorization-url"
+        environment.update(
+            BROWSER=str(bin_dir / "proteus-capture-browser-url"),
+            PROTEUS_BROWSER_URL_FILE=str(url_file),
+        )
+        login = subprocess.Popen(
+            [sf, "org", "login", "web", "--instance-url", instance_url,
+             "--alias", ALIAS, "--set-default-dev-hub"],
+            stdin=subprocess.DEVNULL, env=environment,
+        )
+        try:
+            url = wait_for_url(login, url_file)
+            print(f"Open this URL in your macOS browser, log in as the Dev Hub User, and approve access:\n\n  {url}\n", flush=True)
+            if login.wait():
+                raise Incomplete("Salesforce CLI login failed.")
+        finally:
+            if login.poll() is None:
+                login.terminate()
+                login.wait()
+
+    result = subprocess.run(
+        [sf, "org", "display", "--target-org", ALIAS, "--json"],
+        stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120,
+    )
+    try:
+        connected = json.loads(result.stdout)["result"]["connectedStatus"] == "Connected"
+    except (ValueError, KeyError, TypeError):
+        connected = False
+    if result.returncode or not connected:
+        raise Incomplete(f"Salesforce CLI does not report the {ALIAS} authorization as connected.")
+
+
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: proteus-enroll-salesforce INSTANCE_URL", file=sys.stderr)
+        return 2
+    try:
+        enroll(sys.argv[1])
+    except (Incomplete, OSError, subprocess.TimeoutExpired) as error:
+        message = str(error) if isinstance(error, Incomplete) else "Could not run Salesforce CLI."
+        print(message, file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print("Salesforce Credential Enrollment interrupted.", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
