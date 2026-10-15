@@ -66,7 +66,7 @@ Create, start, and provision the VM before first use. On later days, start it an
 
 ## Git identity
 
-Set Git identity in the guest-local file included by the Managed Dotfiles Git configuration:
+The Managed Dotfiles Git configuration sets the default Git identity to Carlos del Moral with a GitHub no-reply email. To override it, set Git identity in the guest-local file it includes:
 
 ```bash
 git config --file ~/.gitconfig.local user.name "Your Name"
