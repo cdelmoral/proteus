@@ -1,5 +1,5 @@
 format = """
-$directory$git_branch$git_status$cmd_duration
+$hostname$directory$git_branch$git_status$cmd_duration
 $status$character"""
 
 [cmd_duration]
@@ -10,9 +10,14 @@ format = "took [$duration]($style) "
 disabled = false
 format = "[$status]($style) "
 
+[hostname]
+ssh_only = false
+format = "[ proteus ]($style) "
+style = "bold black bg:yellow"
+
 [character]
-success_symbol = "[❯](bold green)"
-error_symbol = "[❯](bold red)"
+success_symbol = "[⬢](bold green)"
+error_symbol = "[⬢](bold red)"
 
 [directory]
 format = "[$path]($style) "
