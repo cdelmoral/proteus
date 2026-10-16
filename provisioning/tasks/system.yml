@@ -9,7 +9,7 @@
 
 - name: Create the projects directory
   ansible.builtin.file:
-    path: "{{ ansible_user_dir }}/projects"
+    path: "{{ ansible_facts.user_dir }}/projects"
     state: directory
     mode: "0755"
 
@@ -73,7 +73,7 @@
 
 - name: Add the Lima user to the Docker group
   ansible.builtin.user:
-    name: "{{ ansible_user_id }}"
+    name: "{{ ansible_facts.user_id }}"
     groups:
       - docker
     append: true
