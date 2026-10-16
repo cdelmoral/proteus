@@ -1,7 +1,10 @@
 ---
+# The playbook bootstraps this interpreter; pinning it skips discovery.
+ansible_python_interpreter: /usr/bin/python3
+
 managed_user_environment:
-  HOME: "{{ ansible_user_dir }}"
-  XDG_CONFIG_HOME: "{{ ansible_user_dir }}/.config"
+  HOME: "{{ ansible_facts.user_dir }}"
+  XDG_CONFIG_HOME: "{{ ansible_facts.user_dir }}/.config"
 
 baseline_system_packages:
   - build-essential
@@ -25,7 +28,7 @@ mise_download_url: >-
 mise_checksum: >-
   sha256:0ef0a778eaa8599f3e90a8a0979c9fc3f79922cafb5fa6d39f366d974da33bba
 mise_install_dir: >-
-  {{ ansible_user_dir }}/.local/share/proteus/mise/{{ mise_version }}
+  {{ ansible_facts.user_dir }}/.local/share/proteus/mise/{{ mise_version }}
 mise_binary: "{{ mise_install_dir }}/mise"
 
 node_version: "24.20.0"
@@ -51,9 +54,9 @@ development_npm_packages:
     command: sf
     link: "{{ salesforce_cli_dir }}/sf"
 
-salesforce_cli_dir: "{{ ansible_user_dir }}/.local/share/proteus/salesforce-cli"
+salesforce_cli_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/salesforce-cli"
 
-managed_dotfiles_dir: "{{ ansible_user_dir }}/.local/share/proteus/dotfiles"
+managed_dotfiles_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/dotfiles"
 
 docker_packages:
   - containerd.io

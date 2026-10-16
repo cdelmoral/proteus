@@ -11,9 +11,9 @@
     state: directory
     mode: "0755"
   loop:
-    - "{{ ansible_user_dir }}/.cache/proteus"
-    - "{{ ansible_user_dir }}/.config/mise"
-    - "{{ ansible_user_dir }}/.local/bin"
+    - "{{ ansible_facts.user_dir }}/.cache/proteus"
+    - "{{ ansible_facts.user_dir }}/.config/mise"
+    - "{{ ansible_facts.user_dir }}/.local/bin"
     - "{{ mise_install_dir }}"
     - "{{ salesforce_cli_dir }}"
 
@@ -27,7 +27,7 @@
 - name: Link mise into the user binary directory
   ansible.builtin.file:
     src: "{{ mise_binary }}"
-    dest: "{{ ansible_user_dir }}/.local/bin/mise"
+    dest: "{{ ansible_facts.user_dir }}/.local/bin/mise"
     state: link
     force: true
 
@@ -91,7 +91,7 @@
   loop:
     - "{{ managed_node.stdout | trim }}/bin/corepack"
     - "{{ managed_node.stdout | trim }}/lib/node_modules/corepack"
-    - "{{ ansible_user_dir }}/.local/share/mise/shims/corepack"
+    - "{{ ansible_facts.user_dir }}/.local/share/mise/shims/corepack"
 
 - name: Install the latest npm packages
   ansible.builtin.command:
@@ -105,14 +105,14 @@
   loop: "{{ development_npm_packages }}"
   environment: >-
     {{ managed_user_environment | combine({
-      "PATH": (managed_node.stdout | trim) ~ "/bin:" ~ ansible_env.PATH
+      "PATH": (managed_node.stdout | trim) ~ "/bin:" ~ ansible_facts.env.PATH
     }) }}
   changed_when: true
 
 - name: Link the npm package commands
   ansible.builtin.file:
     src: "{{ managed_node.stdout | trim }}/bin/{{ item.command }}"
-    dest: "{{ item.link | default(ansible_user_dir ~ '/.local/bin/' ~ item.command) }}"
+    dest: "{{ item.link | default(ansible_facts.user_dir ~ '/.local/bin/' ~ item.command) }}"
     state: link
     force: true
   loop: "{{ development_npm_packages }}"
@@ -127,7 +127,7 @@
 - name: Read the registered Claude Code marketplaces
   ansible.builtin.command:
     argv:
-      - "{{ ansible_user_dir }}/.local/bin/claude"
+      - "{{ ansible_facts.user_dir }}/.local/bin/claude"
       - plugin
       - marketplace
       - list
@@ -139,7 +139,7 @@
 - name: Register the official Claude Code marketplace
   ansible.builtin.command:
     argv:
-      - "{{ ansible_user_dir }}/.local/bin/claude"
+      - "{{ ansible_facts.user_dir }}/.local/bin/claude"
       - plugin
       - marketplace
       - add
@@ -156,7 +156,7 @@
 - name: Install Matt Pocock's Claude Code skills
   ansible.builtin.command:
     argv:
-      - "{{ ansible_user_dir }}/.local/bin/claude"
+      - "{{ ansible_facts.user_dir }}/.local/bin/claude"
       - plugin
       - install
       - mattpocock-skills@claude-plugins-official
@@ -166,6 +166,6 @@
 - name: Link the Ubuntu fd command under its expected name
   ansible.builtin.file:
     src: /usr/bin/fdfind
-    dest: "{{ ansible_user_dir }}/.local/bin/fd"
+    dest: "{{ ansible_facts.user_dir }}/.local/bin/fd"
     state: link
     follow: false
