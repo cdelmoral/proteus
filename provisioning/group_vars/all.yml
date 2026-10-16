@@ -15,6 +15,7 @@ baseline_system_packages:
   - gnupg
   - jq
   - neovim
+  - openssh-client
   - pipx
   - python3
   - python3-venv

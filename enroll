@@ -31,8 +31,14 @@ if [[ "$tool" == github ]]; then
   fi
   readonly reference
 
-  if [[ -z "$reference" ]]; then
-    printf 'GitHub credential source is not configured. Run ./configure first.\n' >&2
+  if ! signing_reference="$(proteus_signing_reference)"; then
+    printf 'GitHub credential sources are not configured. Run ./configure first.\n' >&2
+    exit 1
+  fi
+  readonly signing_reference
+
+  if [[ -z "$reference" || -z "$signing_reference" ]]; then
+    printf 'GitHub token and Git signing key sources are required. Run ./configure first.\n' >&2
     exit 1
   fi
 elif [[ ! -t 0 || ! -t 1 ]]; then
@@ -142,18 +148,27 @@ fi
 # HOME must expand in the guest.
 # shellcheck disable=SC2016
 if ! limactl shell --tty=false "$instance" sh -c \
-  'test -x "$HOME/.local/bin/proteus-enroll-github" && test -x "$HOME/.local/bin/proteus-git-credential-github" && test -x "$HOME/.local/bin/gh" && command -v gh >/dev/null' >/dev/null 2>&1; then
+  'test -x "$HOME/.local/bin/proteus-enroll-github" && test -x "$HOME/.local/bin/proteus-git-credential-github" && test -x "$HOME/.local/bin/gh" && command -v gh >/dev/null && command -v git >/dev/null && command -v ssh-keygen >/dev/null' >/dev/null 2>&1; then
   printf "Lima instance '%s' has not been provisioned with GitHub Credential Enrollment. Run ./provision first.\n" "$instance" >&2
   exit 1
 fi
 
+# Resolve both credentials before sending anything to the guest. Keep secrets in
+# shell memory and standard input, never arguments, exported variables, or files.
+if ! token="$(op read "$reference")" ||
+  ! signing_key="$(op read "${signing_reference%\?ssh-format=openssh}?ssh-format=openssh")"; then
+  printf 'Could not read the GitHub token and Git signing key from 1Password.\n' >&2
+  exit 1
+fi
+
+# The first line is the token; the remaining input is the OpenSSH private key.
 # HOME must expand in the guest.
 # shellcheck disable=SC2016
-if ! op read "$reference" |
+if ! printf '%s\n%s\n' "$token" "$signing_key" |
   limactl shell --tty=false "$instance" sh -c \
     'exec "$HOME/.local/bin/proteus-enroll-github"'; then
   printf "GitHub Credential Enrollment failed for Lima instance '%s'.\n" "$instance" >&2
   exit 1
 fi
 
-printf "Enrolled the GitHub credential in Lima instance '%s'. Git HTTPS and GitHub CLI access are ready.\n" "$instance"
+printf "Enrolled GitHub credentials in Lima instance '%s'. Git HTTPS, GitHub CLI access, and commit signing are ready.\n" "$instance"

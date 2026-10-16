@@ -52,6 +52,10 @@ _Avoid_: Bootstrap, setup script
 The explicit creation, host injection, or authorization of credentials after Provisioning.
 _Avoid_: Credential provisioning, credential import
 
+**GitHub Credential Enrollment**:
+The explicit enrollment of a selected GitHub access token and Git signing key as Host-Injected Credentials for repository access and commit signing.
+_Avoid_: GitHub login, signing enrollment
+
 **T3 Enrollment**:
 The explicit authorization of Proteus for T3 Connect and establishment of persistent remote access after Provisioning. Provider Credential Enrollment is separate.
 _Avoid_: T3 login, provider enrollment

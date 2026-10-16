@@ -11,6 +11,8 @@ import tempfile
 import time
 import unittest
 
+from ssh_keys import generate_signing_key
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -195,14 +197,34 @@ class EnrollmentTest(EnrollmentHarness):
                 self.assertIn("Usage:", output)
                 self.assertEqual(self.calls(), [])
 
-    def test_github_still_streams_and_validates_selected_token(self):
-        configuration = Path(self.environment["XDG_CONFIG_HOME"]) / "proteus/config"
-        configuration.parent.mkdir(parents=True)
-        configuration.write_text("github_token_1password_reference=op://test/GitHub/token\n")
+
+class GitHubEnrollmentTest(EnrollmentHarness):
+    def setUp(self):
+        super().setUp()
+        self.configuration = Path(self.environment["XDG_CONFIG_HOME"]) / "proteus/config"
+        self.configuration.parent.mkdir(parents=True)
+        self.configuration.write_text(
+            "github_token_1password_reference=op://test/GitHub/token\n"
+            "git_signing_key_1password_reference=op://test/Signing/private key\n"
+        )
+        self.fixture_key = generate_signing_key(self.directory)
+        self.environment["TEST_SIGNING_KEY"] = str(self.fixture_key)
+        self.op_log = self.directory / "op-calls.jsonl"
+        self.environment["TEST_OP_LOG"] = str(self.op_log)
         self.write_command(self.bin / "op", """
-import sys
-assert sys.argv[1:] == ['read', 'op://test/GitHub/token']
-print('test-github-token')
+import json, os, pathlib, sys
+with open(os.environ['TEST_OP_LOG'], 'a') as log:
+    log.write(json.dumps(sys.argv[1:]) + '\\n')
+if sys.argv[1:] == ['read', 'op://test/GitHub/token']:
+    if os.environ.get('TEST_OP_FAIL') == 'token':
+        sys.exit(1)
+    print('test-github-token')
+elif sys.argv[1:] == ['read', 'op://test/Signing/private key?ssh-format=openssh']:
+    print(pathlib.Path(os.environ['TEST_SIGNING_KEY']).read_text(), end='')
+    if os.environ.get('TEST_OP_FAIL') == 'signing':
+        sys.exit(1)
+else:
+    sys.exit(91)
 """)
         self.write_command(self.bin / "gh", """
 import os, sys
@@ -214,6 +236,8 @@ sys.exit(1 if os.environ.get('TEST_STATUS_FAIL') else 0)
             destination = self.guest / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / "dotfiles/home" / relative, destination)
+
+    def test_github_streams_both_credentials_without_disclosing_secrets(self):
         status, output = self.run_enroll("github", terminal=False)
         self.assertEqual(status, 0, output)
         token = self.guest / ".local/share/proteus/secrets/github-token"
@@ -221,10 +245,66 @@ sys.exit(1 if os.environ.get('TEST_STATUS_FAIL') else 0)
         self.assertEqual(token.stat().st_mode & 0o777, 0o600)
         self.assertNotIn("test-github-token", output)
         self.assertNotIn("test-github-token", self.log.read_text())
+        signing_key = token.parent / "git-signing-key"
+        self.assertEqual(signing_key.read_bytes(), self.fixture_key.read_bytes())
+        self.assertEqual(signing_key.stat().st_mode & 0o777, 0o600)
+        for line in self.fixture_key.read_text().splitlines():
+            self.assertNotIn(line, output + self.log.read_text())
+        self.assertEqual([json.loads(line) for line in self.op_log.read_text().splitlines()], [
+            ["read", "op://test/GitHub/token"],
+            ["read", "op://test/Signing/private key?ssh-format=openssh"],
+        ])
+        self.assertFalse((Path(self.environment["HOME"]) / ".local/share/proteus/secrets").exists())
+        self.assertEqual(list(token.parent.glob(".github-enrollment.*")), [])
+
+    def test_github_preserves_previous_token_when_validation_fails(self):
+        self.assertEqual(self.run_enroll("github", terminal=False)[0], 0)
+        token = self.guest / ".local/share/proteus/secrets/github-token"
         token.write_text("previous-token")
         status, output = self.run_enroll("github", terminal=False, TEST_STATUS_FAIL="1")
         self.assertEqual(status, 1, output)
         self.assertEqual(token.read_text(), "previous-token")
+
+    def test_github_requires_both_references_before_contacting_vm(self):
+        for config in ("", "github_token_1password_reference=op://test/GitHub/token\n",
+                       "git_signing_key_1password_reference=op://test/Signing/private key\n"):
+            with self.subTest(config=config):
+                self.configuration.write_text(config)
+                status, output = self.run_enroll("github", terminal=False)
+                self.assertEqual(status, 1, output)
+                self.assertIn("Run ./configure first", output)
+                self.assertEqual(self.calls(), [])
+                self.assertFalse(self.op_log.exists())
+
+    def test_failed_secret_read_does_not_install_even_partially_read_credentials(self):
+        for failure in ("token", "signing"):
+            with self.subTest(failure=failure):
+                status, output = self.run_enroll("github", terminal=False, TEST_OP_FAIL=failure)
+                self.assertEqual(status, 1, output)
+                self.assertIn("Could not read", output)
+                self.assertNotIn("test-github-token", output)
+                self.assertNotIn(self.fixture_key.read_text().strip(), output)
+                self.assertFalse((self.guest / ".local/share/proteus/secrets").exists())
+
+    def test_github_targets_custom_running_instance(self):
+        status, output = self.run_enroll("github", "custom-instance", terminal=False)
+        self.assertEqual(status, 0, output)
+        self.assertTrue(all("custom-instance" in call for call in self.calls()))
+
+    def test_github_checks_vm_before_reading_secrets(self):
+        for vm_status in ("", "Stopped"):
+            with self.subTest(vm_status=vm_status):
+                status, output = self.run_enroll("github", terminal=False, TEST_VM_STATUS=vm_status)
+                self.assertEqual(status, 1, output)
+                self.assertTrue(all(call[0] == "list" for call in self.calls()))
+                self.assertFalse(self.op_log.exists())
+
+    def test_github_accepts_signing_reference_with_openssh_format_suffix(self):
+        self.configuration.write_text(self.configuration.read_text().replace(
+            "op://test/Signing/private key", "op://test/Signing/private key?ssh-format=openssh",
+        ))
+        status, output = self.run_enroll("github", terminal=False)
+        self.assertEqual(status, 0, output)
 
 
 if __name__ == "__main__":
