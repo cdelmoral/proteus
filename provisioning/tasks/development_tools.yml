@@ -163,6 +163,26 @@
   environment: "{{ managed_user_environment }}"
   changed_when: true
 
+- name: Create the Claude Code managed settings directory
+  ansible.builtin.file:
+    path: /etc/claude-code
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+# Unlike ~/.claude/settings.json, which plugin installation updates, Claude
+# Code never writes managed settings, so Provisioning can own this file.
+- name: Disable Claude Code commit and pull request attribution
+  ansible.builtin.copy:
+    dest: /etc/claude-code/managed-settings.json
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ {'attribution': {'commit': '', 'pr': ''}} | to_nice_json }}\n"
+  become: true
+
 - name: Link the Ubuntu fd command under its expected name
   ansible.builtin.file:
     src: /usr/bin/fdfind
