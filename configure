@@ -7,17 +7,25 @@ readonly script_dir
 source "${script_dir}/lib/config.sh"
 
 current_reference="$(proteus_github_reference)"
+current_signing_reference="$(proteus_signing_reference)"
 
-if [[ -n "$current_reference" ]]; then
-  printf 'GitHub token 1Password secret reference [%s]: ' "$current_reference"
-else
-  printf 'GitHub token 1Password secret reference: '
-fi
+printf 'GitHub token 1Password secret reference (e.g. op://vault/item/entry)%s: ' \
+  "${current_reference:+ [$current_reference]}"
 IFS= read -r reference || true
 reference="${reference:-$current_reference}"
 
 if [[ -z "$reference" ]]; then
   printf 'A GitHub token 1Password secret reference is required.\n' >&2
+  exit 1
+fi
+
+printf 'Git signing key 1Password secret reference (e.g. op://vault/item/private key)%s: ' \
+  "${current_signing_reference:+ [$current_signing_reference]}"
+IFS= read -r signing_reference
+signing_reference="${signing_reference:-$current_signing_reference}"
+
+if [[ -z "$signing_reference" ]]; then
+  printf 'A Git signing key 1Password secret reference is required.\n' >&2
   exit 1
 fi
 
@@ -35,6 +43,6 @@ if ! proteus_valid_salesforce_login_url "$login_url"; then
   exit 1
 fi
 
-config_file="$(proteus_save_config "$reference" "$login_url")"
+config_file="$(proteus_save_config "$reference" "$login_url" "$signing_reference")"
 
-printf 'Saved the GitHub credential source and Salesforce login URL to %s.\n' "$config_file"
+printf 'Saved the GitHub credential sources and Salesforce login URL to %s.\n' "$config_file"

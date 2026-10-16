@@ -6,9 +6,11 @@ source "$HOME/.local/lib/proteus/credentials.sh"
 token_file="$(proteus_github_token_file)"
 readonly token_file
 readonly secrets_dir="${token_file%/*}"
+readonly signing_key_file="${secrets_dir}/git-signing-key"
 
-if ! command -v gh >/dev/null 2>&1; then
-  printf 'GitHub CLI is not installed. Run Provisioning before Credential Enrollment.\n' >&2
+if ! command -v gh >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1 ||
+  ! command -v ssh-keygen >/dev/null 2>&1; then
+  printf 'GitHub CLI, Git, and OpenSSH are required. Run Provisioning before Credential Enrollment.\n' >&2
   exit 1
 fi
 
@@ -24,15 +26,27 @@ fi
 umask 077
 mkdir -p "$secrets_dir"
 chmod 700 "$secrets_dir"
-temporary_file="$(mktemp "${secrets_dir}/.github-token.XXXXXX")"
-trap 'rm -f "$temporary_file"' EXIT
-printf '%s' "$token" >"$temporary_file"
-chmod 600 "$temporary_file"
+temporary_dir="$(mktemp -d "${secrets_dir}/.github-enrollment.XXXXXX")"
+trap 'rm -rf "$temporary_dir"' EXIT
+printf '%s' "$token" >"$temporary_dir/token"
+cat >"$temporary_dir/signing-key"
+
+if ! ssh-keygen -y -P '' -f "$temporary_dir/signing-key" </dev/null \
+  >"$temporary_dir/signing-key.pub" 2>/dev/null; then
+  printf 'An unencrypted OpenSSH private signing key is required. Installed credentials were not changed.\n' >&2
+  exit 1
+fi
 
 if ! GH_TOKEN="$token" gh auth status --hostname github.com >/dev/null 2>&1; then
   printf 'GitHub rejected the configured token. The installed credential was not changed.\n' >&2
   exit 1
 fi
 
-mv "$temporary_file" "$token_file"
-trap - EXIT
+mv "$temporary_dir/token" "$token_file"
+mv "$temporary_dir/signing-key" "$signing_key_file"
+mv "$temporary_dir/signing-key.pub" "$signing_key_file.pub"
+
+git config --file "$HOME/.gitconfig.local" gpg.format ssh
+git config --file "$HOME/.gitconfig.local" gpg.ssh.program ssh-keygen
+git config --file "$HOME/.gitconfig.local" user.signingKey "$signing_key_file"
+git config --file "$HOME/.gitconfig.local" commit.gpgSign true

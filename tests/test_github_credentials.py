@@ -7,12 +7,15 @@ import subprocess
 import tempfile
 import unittest
 
+from ssh_keys import generate_signing_key
+
 
 ROOT = Path(__file__).resolve().parents[1]
 GH = shutil.which("gh", path=os.defpath)
 
 
-@unittest.skipUnless(GH and shutil.which("git"), "Git and GitHub CLI are required")
+@unittest.skipUnless(GH and shutil.which("git") and shutil.which("ssh-keygen"),
+                     "Git, GitHub CLI, and OpenSSH are required")
 class GitHubCredentialsTest(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -56,11 +59,14 @@ class GitHubCredentialsTest(unittest.TestCase):
             GIT_TERMINAL_PROMPT="0",
         )
         self.token = self.home / ".local/share/proteus/secrets/github-token"
+        self.fixture_key = generate_signing_key(self.home)
+        self.signing_key = self.token.parent / "git-signing-key"
 
-    def enroll(self, token="fixture-token"):
+    def enroll(self, token="fixture-token", key=None):
         result = subprocess.run(
             [str(self.home / ".local/bin/proteus-enroll-github")],
-            input=token, env=self.environment, capture_output=True, text=True, timeout=10,
+            input=f"{token}\n{key or self.fixture_key.read_text()}",
+            env=self.environment, capture_output=True, text=True, timeout=10,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn(token, result.stdout + result.stderr)
@@ -103,14 +109,96 @@ class GitHubCredentialsTest(unittest.TestCase):
 
     def test_rejected_replacement_token_is_validated_instead_of_enrolled_token(self):
         self.enroll()
+        original_key = self.signing_key.read_bytes()
+        original_config = (self.home / ".gitconfig.local").read_bytes()
+        replacement = generate_signing_key(self.home, "replacement-key")
         result = subprocess.run(
             [str(self.home / ".local/bin/proteus-enroll-github")],
-            input="rejected-token", env=self.environment, capture_output=True, text=True, timeout=10,
+            input=f"rejected-token\n{replacement.read_text()}",
+            env=self.environment, capture_output=True, text=True, timeout=10,
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("GitHub rejected", result.stderr)
         self.assertEqual(self.token.read_text(), "fixture-token")
+        self.assertEqual(self.signing_key.read_bytes(), original_key)
+        self.assertEqual((self.home / ".gitconfig.local").read_bytes(), original_config)
+        self.assertEqual(list(self.token.parent.glob(".github-enrollment.*")), [])
         self.assertNotIn("rejected-token", result.stdout + result.stderr)
+
+    def test_background_commit_signing_preserves_identity_and_survives_reprovisioning(self):
+        local_config = self.home / ".gitconfig.local"
+        local_config.write_text(
+            '[user]\n name = Fixture User\n email = fixture@example.com\n signingKey = old-key\n'
+            '[gpg]\n format = openpgp\n[gpg "ssh"]\n program = /missing/host/signer\n'
+            '[commit]\n gpgSign = false\n[fetch]\n prune = true\n'
+        )
+        self.enroll()
+        self.enroll()  # Repeating enrollment must preserve identity and preferences.
+        shutil.copy2(ROOT / "dotfiles/home/.gitconfig", self.home / ".gitconfig")
+        for name, expected in (("user.name", "Fixture User"), ("user.email", "fixture@example.com"),
+                               ("fetch.prune", "true")):
+            result = subprocess.run(
+                ["git", "config", "--get", name], env=self.environment,
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.stdout.strip(), expected)
+        for path in (self.token, self.signing_key, self.signing_key.with_suffix(".pub")):
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(self.token.parent.stat().st_mode & 0o777, 0o700)
+        self.assertEqual(self.signing_key.read_bytes(), self.fixture_key.read_bytes())
+        self.assertEqual(self.signing_key.with_suffix(".pub").read_text().split()[:2],
+                         self.fixture_key.with_suffix(".pub").read_text().split()[:2])
+
+        repository = self.home / "repository"
+        repository.mkdir()
+        subprocess.run(["git", "init", "-q", str(repository)], check=True,
+                       env=self.environment, capture_output=True, timeout=10)
+        # Simulate a background service with no terminal or SSH agent.
+        environment = {key: value for key, value in self.environment.items()
+                       if key not in ("SSH_AUTH_SOCK", "SSH_AGENT_PID")}
+        commit = subprocess.run(
+            ["git", "commit", "--allow-empty", "-m", "Signed fixture"], cwd=repository,
+            env=environment, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(commit.returncode, 0, commit.stderr)
+        allowed_signers = self.home / "allowed_signers"
+        allowed_signers.write_text(f"fixture@example.com {self.signing_key.with_suffix('.pub').read_text()}")
+        verified = subprocess.run(
+            ["git", "-c", f"gpg.ssh.allowedSignersFile={allowed_signers}", "verify-commit", "HEAD"],
+            cwd=repository, env=environment, capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(verified.returncode, 0, verified.stderr)
+
+    def test_invalid_or_encrypted_key_preserves_existing_credentials_and_config(self):
+        self.enroll()
+        original = {path: path.read_bytes() for path in (
+            self.token, self.signing_key, self.signing_key.with_suffix(".pub"),
+            self.home / ".gitconfig.local",
+        )}
+        encrypted = generate_signing_key(self.home, "encrypted-key", passphrase="fixture-passphrase")
+        for key in ("", "invalid private key", encrypted.read_text()):
+            with self.subTest(key_type="encrypted" if key.startswith("-----") else "missing or malformed"):
+                result = subprocess.run(
+                    [str(self.home / ".local/bin/proteus-enroll-github")],
+                    input=f"replacement-token\n{key}", env=self.environment,
+                    capture_output=True, text=True, timeout=10,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("unencrypted OpenSSH private signing key", result.stderr)
+                self.assertNotIn("replacement-token", result.stdout + result.stderr)
+                if key:
+                    self.assertNotIn(key, result.stdout + result.stderr)
+                for path, content in original.items():
+                    self.assertEqual(path.read_bytes(), content)
+                self.assertEqual(list(self.token.parent.glob(".github-enrollment.*")), [])
+
+    def test_reenrollment_rotates_key_and_token(self):
+        self.enroll()
+        replacement = generate_signing_key(self.home, "replacement-key")
+        self.enroll("rotated-token", key=replacement.read_text())
+        self.assertEqual(self.signing_key.read_bytes(), replacement.read_bytes())
+        self.assertEqual(self.token.read_text(), "rotated-token")
+        self.assertEqual(list(self.token.parent.glob(".github-enrollment.*")), [])
 
     def test_missing_enrolled_token_preserves_native_gh_behavior_and_exit_status(self):
         for home in (self.home, self.home / "other-user"):

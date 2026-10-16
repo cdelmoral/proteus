@@ -74,9 +74,10 @@ else:
     def configuration(self):
         return Path(self.environment["XDG_CONFIG_HOME"]) / "proteus/config"
 
-    def configure(self, *answers):
+    def configure(self, reference, login_url):
         result = subprocess.run(
-            [str(ROOT / "configure")], input="".join(f"{answer}\n" for answer in answers),
+            [str(ROOT / "configure")],
+            input=f"{reference}\nop://test/Signing/private key\n{login_url}\n",
             env=self.environment, capture_output=True, text=True, timeout=10,
         )
         return result.returncode, result.stdout + result.stderr
@@ -212,6 +213,7 @@ else:
         self.assertEqual(self.configure("op://test/GitHub/rotated", "")[0], 0)
         self.assertEqual(self.configure("", "https://other.my.salesforce.com")[0], 0)
         self.assertEqual(sorted(self.configuration.read_text().splitlines()), [
+            "git_signing_key_1password_reference=op://test/Signing/private key",
             "github_token_1password_reference=op://test/GitHub/rotated",
             "salesforce_login_url=https://other.my.salesforce.com",
         ])

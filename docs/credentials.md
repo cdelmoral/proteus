@@ -4,16 +4,24 @@ Run enrollment commands from the repository root on macOS after creating, starti
 
 ## GitHub
 
-After Provisioning, enroll the fine-grained GitHub personal access token selected by `./configure`:
+Before first enrollment, store a fine-grained GitHub personal access token and a dedicated Ed25519 SSH signing key in 1Password. Create the SSH Key item in 1Password and add its public key to GitHub with key type **Signing Key**. This is a one-time step for each key; enrollment does not register keys or check their GitHub registration. See [1Password's SSH key guide](https://developer.1password.com/docs/ssh/manage-keys/) and [GitHub's registration guide](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account).
+
+Run `./configure` and supply the token field's reference and the SSH item's private-key field reference. If you previously configured only a token, run `./configure` again to add the signing-key reference. After Provisioning, enroll both credentials:
 
 ```bash
 ./enroll github
 limactl shell proteus
 ```
 
-Enrollment asks `op read` to resolve the configured 1Password reference and lets 1Password handle authentication, unlocking, and account selection. The token is streamed to the running guest through standard input. Proteus does not put it in command arguments, environment forwarding, a host file, or terminal output. The command fails if the instance is missing, stopped, or has not been provisioned, and it never creates, starts, stops, deletes, or provisions an instance.
+Enrollment asks `op read` to resolve both configured 1Password references on macOS and lets 1Password handle authentication, unlocking, and account selection. It requests the private key in OpenSSH format, resolves both credentials before transferring either, and streams the token followed by the multiline key to the running guest through standard input. Proteus does not put the secrets in command arguments, environment forwarding, host files, or terminal output. The command fails if the instance is missing, stopped, or has not been provisioned, and it never creates, starts, stops, deletes, or provisions an instance.
 
-The guest validates the token before atomically replacing `~/.local/share/proteus/secrets/github-token`. The secrets directory is private to the guest user and the token file has mode `0600`. The token is stored as data, not shell code. A stopped VM retains it; deleting the VM removes it with the guest disk.
+The guest derives the SSH public key and validates the token before replacing installed credentials. A missing, malformed, or passphrase-protected key or rejected token leaves the installed credentials unchanged. The files are installed individually without rollback across the whole enrollment; if a later installation or Git configuration step fails, correct the reported problem and rerun enrollment.
+
+The token is stored at `~/.local/share/proteus/secrets/github-token`, the private key at `~/.local/share/proteus/secrets/git-signing-key`, and the derived public key at the same path with `.pub` appended. The secrets directory is private to the guest user and the files have mode `0600`. A stopped VM retains them; deleting the VM removes the guest copies.
+
+Enrollment updates only `gpg.format`, `gpg.ssh.program`, `user.signingKey`, and `commit.gpgSign` in `~/.gitconfig.local`, preserving the existing Git identity and unrelated settings. Git signs commits by default using the private key directly through `ssh-keygen`, without an SSH agent or interactive unlock. Enrollment does not create a test commit or verify signatures. Provisioning preserves the credentials and guest-local Git configuration, and repeating enrollment replaces the selected token and signing key without restarting T3.
+
+The guest holds an unencrypted working copy so background processes can sign. Use a key dedicated to Proteus commit signing and register it only for signing. The guest user and guest root can read the key and use it outside 1Password. Rebuilds reuse the same GitHub registration; deleting a VM does not invalidate any copies of its key. To rotate it, replace the key in 1Password, update GitHub's signing-key registration, and enroll again.
 
 Managed Dotfiles configure Git's HTTPS credential helper for `github.com` and `gist.github.com`. The helper reads the enrolled token each time Git requests credentials and passes it to a GitHub CLI subprocess. HTTPS Git operations work in interactive shells, non-interactive commands, and background services such as T3 without requiring `GH_TOKEN` in their environment. Enrollment does not rewrite Managed Dotfiles, so repeating Provisioning preserves this configuration. Token replacement takes effect on the next Git operation without restarting a service.
 
@@ -23,7 +31,7 @@ New interactive Bash sessions continue to read the file and export `GH_TOKEN`. P
 
 If Git or GitHub CLI commands in T3 cannot authenticate after switching to its background service, apply the updated Managed Dotfiles and launcher with `./provision` from macOS. Run `./enroll github` if the guest has not enrolled its GitHub token, then retry the command in T3. No T3 service restart is required.
 
-The guest receives only this selected Host-Injected Credential. It cannot invoke 1Password, browse the vault, or retrieve another host credential. Continue to create AWS, cloud, OpenCode, T3 Code, Salesforce, and other credentials inside the guest only when needed.
+The guest receives only these selected Host-Injected Credentials. It cannot invoke 1Password, browse the vault, or retrieve another host credential. Continue to create AWS, cloud, OpenCode, T3 Code, Salesforce, and other credentials inside the guest only when needed.
 
 ## Claude Code
 

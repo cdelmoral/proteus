@@ -2,6 +2,7 @@
 
 readonly _proteus_config_file="${XDG_CONFIG_HOME:-$HOME/.config}/proteus/config"
 readonly _proteus_github_reference_key='github_token_1password_reference'
+readonly _proteus_signing_reference_key='git_signing_key_1password_reference'
 readonly _proteus_salesforce_login_url_key='salesforce_login_url'
 readonly proteus_default_salesforce_login_url='https://login.salesforce.com'
 
@@ -60,6 +61,14 @@ proteus_github_reference() {
   _proteus_config_value "$_proteus_config_file" "$_proteus_github_reference_key"
 }
 
+proteus_signing_reference() {
+  if [[ ! -f "$_proteus_config_file" ]]; then
+    return 0
+  fi
+
+  _proteus_config_value "$_proteus_config_file" "$_proteus_signing_reference_key"
+}
+
 # Prints the saved Salesforce login URL, or the standard login URL if none is saved.
 proteus_salesforce_login_url() {
   local url=''
@@ -80,8 +89,10 @@ proteus_valid_salesforce_login_url() {
 proteus_save_config() {
   local reference="$1"
   local salesforce_login_url="$2"
+  local signing_reference="$3"
 
   _proteus_save_config_values \
     "$_proteus_github_reference_key" "$reference" \
+    "$_proteus_signing_reference_key" "$signing_reference" \
     "$_proteus_salesforce_login_url_key" "$salesforce_login_url"
 }

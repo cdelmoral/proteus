@@ -23,17 +23,17 @@ The host commands check their own prerequisites but do not install or change mac
 
 ## Host configuration
 
-Tell Proteus which 1Password field contains the fine-grained GitHub personal access token:
+Tell Proteus which 1Password fields contain the fine-grained GitHub personal access token and SSH private signing key:
 
 ```bash
 ./configure
 ```
 
-Enter the field's 1Password secret reference when prompted. Proteus stores the reference, not the token, in `${XDG_CONFIG_HOME:-$HOME/.config}/proteus/config`. It treats the reference as opaque text and does not contact 1Password. Run `./configure` again to accept the current reference or replace it.
+Both references are required. The prompts show examples such as `op://vault/item/entry` for the token and `op://vault/item/private key` for the signing key. Proteus stores only the references in `${XDG_CONFIG_HOME:-$HOME/.config}/proteus/config`; it treats them as data and does not contact 1Password. Run `./configure` again to accept the current references or replace either one. If you previously configured only a token, run it again to add the signing-key reference.
 
-The `op` command is not needed while configuring the reference. It is required later when Credential Enrollment resolves that reference.
+The `op` command is not needed while configuring the references. It is required later when Credential Enrollment resolves them. Create the signing key and register its public key with GitHub once, following the [credential guide](./credentials.md#github).
 
-`./configure` then asks for the Salesforce login URL used by `./enroll salesforce`. Press Enter to keep the value shown, which is `https://login.salesforce.com` until you save another. Enter your org's My Domain URL, such as `https://example.my.salesforce.com`, if it requires one. The URL must use `https://`, have a host ending in `.salesforce.com`, and have no path, query, or fragment; a trailing slash is removed. An invalid URL fails without changing the saved configuration. Saving either value preserves the other, and the GitHub reference remains required. If no Salesforce login URL is saved, including in configuration written before this prompt existed, enrollment uses `https://login.salesforce.com`.
+`./configure` then asks for the Salesforce login URL used by `./enroll salesforce`. Press Enter to keep the value shown, which is `https://login.salesforce.com` until you save another. Enter your org's My Domain URL, such as `https://example.my.salesforce.com`, if it requires one. The URL must use `https://`, have a host ending in `.salesforce.com`, and have no path, query, or fragment; a trailing slash is removed. An invalid URL fails without changing the saved configuration. Saving these values preserves unrelated configuration; both GitHub references remain required. If no Salesforce login URL is saved, including in configuration written before this prompt existed, enrollment uses `https://login.salesforce.com`.
 
 ## Operating workflow
 
@@ -44,7 +44,7 @@ Run these commands from the repository root. Lima owns the VM lifecycle; Provisi
 | Create Proteus from the VM Definition | `limactl create --name=proteus ./vm/proteus.yaml` |
 | Start Proteus | `limactl start proteus` |
 | Apply Provisioning | `./provision` |
-| Enroll the configured GitHub credential | `./enroll github` |
+| Enroll GitHub access and commit signing | `./enroll github` |
 | Authorize Claude Code inside the guest | `./enroll claude` |
 | Authorize T3 Connect and install its persistent guest service | `./enroll t3` |
 | Authorize the Salesforce Dev Hub User inside the guest | `./enroll salesforce` |
@@ -73,6 +73,8 @@ git config --file ~/.gitconfig.local user.name "Your Name"
 git config --file ~/.gitconfig.local user.email "you@example.com"
 ```
 
+GitHub Credential Enrollment preserves this identity and unrelated preferences while updating the signing settings in the same file.
+
 ## Rebuild Proteus
 
 Deleting Proteus permanently removes its repositories, uncommitted work, VM-Local Credentials, Host-Injected Credentials, and other guest state.
@@ -96,6 +98,6 @@ limactl start proteus
 limactl shell proteus
 ```
 
-Then clone your repositories and repeat any other Credential Enrollment. This restores the Development Baseline and the selected GitHub credential, not the rest of the deleted VM's contents.
+Then clone your repositories and repeat any other Credential Enrollment. This restores the Development Baseline and the selected GitHub token and signing key, not the rest of the deleted VM's contents. Reusing the signing key preserves its existing GitHub registration.
 
 See [Credential Enrollment](./credentials.md) for authentication details and [Provisioning](./provisioning.md) for the Development Baseline.
