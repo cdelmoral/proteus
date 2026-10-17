@@ -7,11 +7,11 @@ readonly script_dir
 source "${script_dir}/lib/config.sh"
 
 usage() {
-  printf 'Usage: %s {github|claude|t3|salesforce} [instance-name]\n' "${0##*/}" >&2
+  printf 'Usage: %s {github|claude|t3|salesforce|twg} [instance-name]\n' "${0##*/}" >&2
 }
 
 if [[ $# -lt 1 || $# -gt 2 ||
-  ( "$1" != github && "$1" != claude && "$1" != t3 && "$1" != salesforce ) ||
+  ( "$1" != github && "$1" != claude && "$1" != t3 && "$1" != salesforce && "$1" != twg ) ||
   ( $# -eq 2 && ( -z "$2" || "$2" == -* ) ) ]]; then
   usage
   exit 2
@@ -46,6 +46,8 @@ elif [[ ! -t 0 || ! -t 1 ]]; then
     printf 'T3 Enrollment requires an interactive terminal for input and output.\n' >&2
   elif [[ "$tool" == salesforce ]]; then
     printf 'Salesforce Credential Enrollment requires an interactive terminal for input and output.\n' >&2
+  elif [[ "$tool" == twg ]]; then
+    printf 'Teamwork Graph Enrollment requires an interactive terminal for input and output.\n' >&2
   else
     printf 'Claude Code Credential Enrollment requires an interactive terminal for input and output.\n' >&2
   fi
@@ -66,6 +68,26 @@ fi
 if [[ "$instance_status" != Running ]]; then
   printf "Lima instance '%s' is not running (status: %s).\n" "$instance" "${instance_status:-unknown}" >&2
   exit 1
+fi
+
+if [[ "$tool" == twg ]]; then
+  # HOME must expand in the guest. The helper owns login, upkeep, and verification.
+  # shellcheck disable=SC2016
+  if ! limactl shell --tty=false --start=false "$instance" sh -c \
+    'test -x "$HOME/.local/bin/twg" && test -x "$HOME/.local/bin/proteus-enroll-twg"' >/dev/null 2>&1; then
+    printf "Lima instance '%s' has not been provisioned with Teamwork Graph CLI. Run ./provision first.\n" "$instance" >&2
+    exit 1
+  fi
+
+  # shellcheck disable=SC2016
+  if ! limactl shell --tty=true --start=false "$instance" sh -c \
+    'exec "$HOME/.local/bin/proteus-enroll-twg"'; then
+    printf "Teamwork Graph Enrollment is incomplete for Lima instance '%s'. Completed steps were preserved.\n" "$instance" >&2
+    exit 1
+  fi
+
+  printf "Enrolled Teamwork Graph in Lima instance '%s'.\n" "$instance"
+  exit 0
 fi
 
 if [[ "$tool" == t3 ]]; then

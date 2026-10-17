@@ -1,0 +1,46 @@
+---
+# Read the official stable release selector without running the interactive installer.
+- name: Read the current Teamwork Graph CLI release
+  ansible.builtin.uri:
+    url: "{{ twg_distribution_url }}/install"
+    return_content: true
+  register: twg_installer
+
+- name: Select the stable Teamwork Graph CLI version
+  ansible.builtin.set_fact:
+    twg_version: >-
+      {{ twg_installer.content | regex_findall('(?m)^DEFAULT_VERSION="([0-9]+\.[0-9]+\.[0-9]+)"$') | first }}
+
+- name: Create the Teamwork Graph CLI installation directory
+  ansible.builtin.file:
+    path: "{{ twg_install_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Download and verify the stable Teamwork Graph CLI binary
+  ansible.builtin.get_url:
+    url: "{{ twg_distribution_url }}/twg-linux-arm64-v{{ twg_version }}"
+    dest: "{{ twg_install_dir }}/twg"
+    checksum: "sha256:{{ twg_distribution_url }}/SHA256SUMS-v{{ twg_version }}"
+    mode: "0755"
+
+- name: Link Teamwork Graph CLI into the user binary directory
+  ansible.builtin.file:
+    src: "{{ twg_install_dir }}/twg"
+    dest: "{{ ansible_facts.user_dir }}/.local/bin/twg"
+    state: link
+    force: true
+
+- name: Install the official Teamwork Graph agent skills
+  ansible.builtin.command:
+    argv:
+      - "{{ twg_install_dir }}/twg"
+      - skills
+      - install
+      - --yes
+      - --agent
+      - claude
+      - --agent
+      - opencode
+  environment: "{{ managed_user_environment }}"
+  changed_when: true
