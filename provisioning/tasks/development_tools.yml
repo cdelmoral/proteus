@@ -189,3 +189,6 @@
     dest: "{{ ansible_facts.user_dir }}/.local/bin/fd"
     state: link
     follow: false
+
+- name: Install Teamwork Graph CLI and agent skills
+  ansible.builtin.import_tasks: teamwork_graph.yml

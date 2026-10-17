@@ -59,3 +59,7 @@ _Avoid_: GitHub login, signing enrollment
 **T3 Enrollment**:
 The explicit authorization of Proteus for T3 Connect and establishment of persistent remote access after Provisioning. Provider Credential Enrollment is separate.
 _Avoid_: T3 login, provider enrollment
+
+**Teamwork Graph Enrollment**:
+The explicit authorization of Proteus to access Jira and Confluence through Teamwork Graph CLI using a VM-Local Credential for the owner's personal Atlassian identity.
+_Avoid_: Atlassian credential provisioning, agent account enrollment
