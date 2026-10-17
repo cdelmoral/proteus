@@ -71,4 +71,5 @@ message: |
     ./enroll claude
     ./enroll t3
     ./enroll salesforce
+    ./enroll twg
     limactl shell proteus

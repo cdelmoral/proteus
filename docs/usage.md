@@ -48,6 +48,7 @@ Run these commands from the repository root. Lima owns the VM lifecycle; Provisi
 | Authorize Claude Code inside the guest | `./enroll claude` |
 | Authorize T3 Connect and install its persistent guest service | `./enroll t3` |
 | Authorize the Salesforce Dev Hub User inside the guest | `./enroll salesforce` |
+| Authorize Jira and Confluence through Teamwork Graph | `./enroll twg` |
 | Open a guest shell | `limactl shell proteus` |
 | Stop Proteus | `limactl stop proteus` |
 | Delete a stopped Proteus VM | `limactl delete proteus` |
@@ -62,6 +63,7 @@ Create, start, and provision the VM before first use. On later days, start it an
 ./enroll claude proteus-acceptance-example
 ./enroll t3 proteus-acceptance-example
 ./enroll salesforce proteus-acceptance-example
+./enroll twg proteus-acceptance-example
 ```
 
 ## Git identity
@@ -83,6 +85,8 @@ If T3 was enrolled, deregister the old environment from your T3 Connect account 
 
 If Salesforce was enrolled, delete scratch orgs you no longer need with `sf org delete scratch`, then revoke the VM's Salesforce CLI access in the Dev Hub User's personal settings under OAuth Connected Apps before deleting the VM. `sf org logout` only removes the guest-local authorization, so no valid production-org token should outlive the VM. See [Salesforce enrollment](./credentials.md#salesforce).
 
+If Teamwork Graph was enrolled, run `twg logout` inside the guest before deletion and check for revocation failures. If it has already been deleted, revoke the TWG grant through your Atlassian account or ask an organization administrator to revoke TWG sessions. See [Teamwork Graph Enrollment](./credentials.md#teamwork-graph).
+
 After preserving anything you need, run:
 
 ```bash
@@ -95,6 +99,7 @@ limactl start proteus
 ./enroll claude
 ./enroll t3
 ./enroll salesforce
+./enroll twg
 limactl shell proteus
 ```
 

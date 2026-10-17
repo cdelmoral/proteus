@@ -79,6 +79,34 @@ Deleting the VM removes its local credentials and service. Before a rebuild, der
 
 The helper expects the `desired`, `authenticated`, and `linked` boolean fields from T3 Connect status. It uses the guest's `T3CODE_HOME`, or `~/.t3` by default, and refuses to replace an existing service configured for another data directory. Run recovery commands with the same data directory when using a custom one.
 
+## Teamwork Graph
+
+After Provisioning, run this command from an interactive macOS terminal:
+
+```bash
+./enroll twg
+```
+
+Teamwork Graph Enrollment authorizes your personal Atlassian identity for Jira and Confluence Cloud. TWG prints a verification URL and short code: open the URL in your macOS browser, confirm the code, review the permissions, and approve access. Select your default site when prompted. This flow does not require a localhost callback port forward, a guest browser, an API token, or 1Password. See [Atlassian's OAuth guide](https://developer.atlassian.com/cloud/twg-cli/getting-started/configure-oauth/).
+
+The selected VM must already be running and provisioned. Enrollment checks TWG's native `twg doctor --basic` result, logs in only if that check fails, and checks again after login. A healthy saved login is preserved. It enables user lingering and runs `twg upkeep enable` so TWG's systemd user timer can refresh credentials after logout and VM boot. Failures are reported with completed steps left intact; retrying does not replace an authorization that is already working. Completion uses only the native basic authentication check and the upkeep enable command's result: it does not probe projects/spaces, create test content, or inspect service health.
+
+TWG owns the VM-Local Credential and its refresh lifecycle. The default file store is under `~/.config/twg/`; Proteus does not copy Atlassian credentials from macOS or opt into experimental encrypted storage. The guest user and guest root can read the enrolled credential. TWG uses it for both interactive and background commands without exporting tokens from shell startup files. Credentials survive VM stops and Provisioning; a rebuild requires fresh enrollment. TWG documents eight-hour access tokens, automatic refresh, and refresh-token expiry after 30 days without use. If authorization expires or is revoked, run `./enroll twg` again. For an intentional account or site change, use TWG's `twg login --force` and `twg setup default-site --site <site>` inside the guest.
+
+The initial setup uses one default site. Each task selects its Jira project or Confluence space. Supported workflows are read/search in both products, Jira issue creation/update/comment, and Confluence creation/editing. These are intended workflows, not a restricted command allowlist: TWG inherits your Atlassian permissions. Organization administrators can limit TWG OAuth access through [Atlassian Administration's TWG settings](https://developer.atlassian.com/cloud/twg-cli/getting-started/configure-permissions/). Authentication or read success does not certify every write permission.
+
+Atlassian's official skills teach agents to use TWG. The additional `proteus-atlassian` skill directs them to basic product commands and requires an explicit user request before enriched operations consume Rovo credits. See [Atlassian's usage explanation](https://developer.atlassian.com/cloud/twg-cli/faq/). This integration adds no separate admin or Bitbucket credential.
+
+Manage refresh inside the guest with:
+
+```bash
+twg upkeep status
+twg upkeep enable
+twg upkeep disable
+```
+
+Before deleting the VM, run `twg logout` inside it. TWG attempts to revoke the OAuth token and removes the saved login; check any reported revocation failure. Logout leaves upkeep installed, so run `twg upkeep disable` if you are keeping the VM but no longer want the helper. If the VM has already been deleted or revocation failed, revoke TWG's grant through your [Atlassian connected apps](https://id.atlassian.com/manage-profile/apps), or ask an organization administrator to revoke TWG sessions. Account-level grant or organization-wide session revocation can affect other TWG installations. Deleting the VM alone does not revoke remote access. See [TWG authentication and logout](https://developer.atlassian.com/cloud/twg-cli/getting-started/how-authentication-works/) and [Atlassian's connected-app management guide](https://support.atlassian.com/security-and-access-policies/docs/manage-your-users-third-party-apps/).
+
 ## Salesforce
 
 After Provisioning, run this command from an interactive macOS terminal:
