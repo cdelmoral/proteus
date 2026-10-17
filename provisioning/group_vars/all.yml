@@ -10,6 +10,7 @@ baseline_system_packages:
   - build-essential
   - ca-certificates
   - curl
+  - dbus-user-session
   - fzf
   - git
   - gnupg
@@ -56,6 +57,9 @@ development_npm_packages:
     link: "{{ salesforce_cli_dir }}/sf"
 
 salesforce_cli_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/salesforce-cli"
+
+twg_distribution_url: https://teamwork-graph.atlassian.com/cli
+twg_install_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/twg"
 
 managed_dotfiles_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/dotfiles"
 

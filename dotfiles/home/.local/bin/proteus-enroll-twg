@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ ! -t 0 || ! -t 1 ]]; then
+  printf 'Teamwork Graph Enrollment requires an interactive terminal for input and output.\n' >&2
+  exit 1
+fi
+
+readonly twg="${HOME}/.local/bin/twg"
+
+# The native check also refreshes saved OAuth credentials when needed.
+if ! "$twg" doctor --basic >/dev/null 2>&1; then
+  printf 'Open the verification URL in your macOS browser, confirm the code, and authorize your personal Atlassian account. Select your default site when prompted.\n'
+  "$twg" login --force
+  if ! "$twg" doctor --basic >/dev/null 2>&1; then
+    printf 'TWG could not confirm authentication. Run twg doctor --basic inside the guest, then retry enrollment.\n' >&2
+    exit 1
+  fi
+fi
+
+# Keep the systemd user manager and its D-Bus session available after logout.
+sudo -n loginctl enable-linger "$(id -un)"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
+"$twg" upkeep enable
