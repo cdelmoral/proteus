@@ -1,0 +1,65 @@
+---
+- name: Require the supported AWS guest platform
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.system == 'Linux'
+      - ansible_facts.architecture == 'aarch64'
+    fail_msg: AWS tooling requires the Linux ARM64 guest.
+
+- name: Create AWS tool installation directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ aws_cli_extract_dir }}"
+    - "{{ aws_helper_install_dir }}"
+
+- name: Download the pinned AWS CLI archive
+  ansible.builtin.get_url:
+    url: "{{ aws_cli_download_url }}"
+    dest: "{{ aws_cli_extract_dir }}/awscli.zip"
+    checksum: "{{ aws_cli_checksum }}"
+    mode: "0644"
+
+- name: Extract the verified AWS CLI archive
+  ansible.builtin.unarchive:
+    src: "{{ aws_cli_extract_dir }}/awscli.zip"
+    dest: "{{ aws_cli_extract_dir }}"
+    remote_src: true
+    creates: "{{ aws_cli_extract_dir }}/aws/install"
+
+- name: Install the pinned AWS CLI
+  ansible.builtin.command:
+    argv:
+      - "{{ aws_cli_extract_dir }}/aws/install"
+      - --install-dir
+      - /usr/local/aws-cli
+      - --bin-dir
+      - /usr/local/bin
+      - --update
+    creates: "/usr/local/aws-cli/v2/{{ aws_cli_version }}/bin/aws"
+  become: true
+
+- name: Select the pinned AWS CLI on the system executable path
+  ansible.builtin.file:
+    src: "/usr/local/aws-cli/v2/{{ aws_cli_version }}/bin/aws"
+    dest: /usr/local/bin/aws
+    state: link
+    force: true
+  become: true
+
+- name: Download the pinned Roles Anywhere helper
+  ansible.builtin.get_url:
+    url: "{{ aws_helper_download_url }}"
+    dest: "{{ aws_helper_install_dir }}/aws_signing_helper"
+    checksum: "{{ aws_helper_checksum }}"
+    mode: "0755"
+
+- name: Expose the Roles Anywhere helper without shell initialization
+  ansible.builtin.file:
+    src: "{{ aws_helper_install_dir }}/aws_signing_helper"
+    dest: /usr/local/bin/aws_signing_helper
+    state: link
+    force: true
+  become: true

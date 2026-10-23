@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set +x
 set -euo pipefail
 
 script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
@@ -7,11 +8,11 @@ readonly script_dir
 source "${script_dir}/lib/config.sh"
 
 usage() {
-  printf 'Usage: %s {github|claude|t3|salesforce|twg} [instance-name]\n' "${0##*/}" >&2
+  printf 'Usage: %s {github|claude|t3|salesforce|twg|aws} [instance-name]\n' "${0##*/}" >&2
 }
 
 if [[ $# -lt 1 || $# -gt 2 ||
-  ( "$1" != github && "$1" != claude && "$1" != t3 && "$1" != salesforce && "$1" != twg ) ||
+  ( "$1" != github && "$1" != claude && "$1" != t3 && "$1" != salesforce && "$1" != twg && "$1" != aws ) ||
   ( $# -eq 2 && ( -z "$2" || "$2" == -* ) ) ]]; then
   usage
   exit 2
@@ -19,7 +20,24 @@ fi
 readonly tool="$1"
 readonly instance="${2:-proteus}"
 
-if [[ "$tool" == github ]]; then
+if [[ "$tool" == aws ]]; then
+  if [[ "$(proteus_config_value proteus_aws_enabled)" != true ]]; then
+    printf 'AWS is not enabled. Run ./configure first.\n' >&2
+    exit 1
+  fi
+  aws_values=()
+  for key in "${proteus_aws_keys[@]}"; do
+    aws_values+=("$(proteus_config_value "$key")")
+  done
+  if ! proteus_valid_aws_config "${aws_values[@]}"; then
+    printf 'AWS configuration is incomplete or inconsistent. Run ./configure first.\n' >&2
+    exit 1
+  fi
+  if ! command -v op >/dev/null 2>&1; then
+    printf 'op is required. Install 1Password CLI.\n' >&2
+    exit 1
+  fi
+elif [[ "$tool" == github ]]; then
   if ! command -v op >/dev/null 2>&1; then
     printf 'op is required. Install 1Password CLI with: brew install --cask 1password-cli\n' >&2
     exit 1
@@ -68,6 +86,31 @@ fi
 if [[ "$instance_status" != Running ]]; then
   printf "Lima instance '%s' is not running (status: %s).\n" "$instance" "${instance_status:-unknown}" >&2
   exit 1
+fi
+
+if [[ "$tool" == aws ]]; then
+  # shellcheck disable=SC2016
+  if ! limactl shell --tty=false --start=false "$instance" sh -c \
+    'test -x "$HOME/.local/bin/proteus-enroll-aws" && test -x /usr/local/bin/aws && test -x /usr/local/bin/aws_signing_helper && command -v openssl >/dev/null && command -v python3 >/dev/null' >/dev/null 2>&1; then
+    printf "Lima instance '%s' has not been provisioned with AWS tooling. Run ./provision first.\n" "$instance" >&2
+    exit 1
+  fi
+  # Suppress external diagnostics: they may contain secret material.
+  if ! certificate="$(op read "${aws_values[5]}" 2>/dev/null)" ||
+    ! private_key="$(op read "${aws_values[6]}" 2>/dev/null)"; then
+    printf 'Could not read both AWS workload credentials from 1Password.\n' >&2
+    exit 1
+  fi
+  # NUL framing allows multiline PEMs without host files or secret arguments.
+  # shellcheck disable=SC2016
+  if ! printf '%s\0' "${aws_values[@]:0:5}" "$certificate" "$private_key" |
+    limactl shell --tty=false --start=false "$instance" sh -c \
+      'exec "$HOME/.local/bin/proteus-enroll-aws"'; then
+    printf 'AWS Credential Enrollment failed; previous enrollment was preserved.\n' >&2
+    exit 1
+  fi
+  printf "Enrolled AWS credentials in Lima instance '%s'.\n" "$instance"
+  exit 0
 fi
 
 if [[ "$tool" == twg ]]; then
