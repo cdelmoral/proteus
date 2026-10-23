@@ -45,3 +45,48 @@ See [Credential Enrollment](./credentials.md) for authentication details and [VM
 AWS tests execute the public configuration and enrollment commands, real guest helper, and real OpenSSL against isolated homes; only installation paths and external Lima, 1Password, helper, and AWS command boundaries are simulated. They check complete configuration, opt-out, retained settings, secret resolution before transfer, prerequisites/custom instances, private files, certificate/key validation, failed candidates preserving active generations, wrong identities, ambient interference, and default-profile use without an interactive shell. AWS Provisioning tests run the real installation tasks against local fixture downloads and a simulated vendor installer, checking checksum rejection, architecture checks, executable availability, repeat installation, and preserved enrollment files. Simulated AWS calls do not prove real AWS trust or production isolation.
 
 On a real macOS-to-Lima installation with externally verified development-account isolation, configure and enroll the workload pair from 1Password. Confirm `aws sts get-caller-identity` reports the intended account and role, then run a permitted AWS read from an agent through T3 without AWS access-key environment variables. Repeat after temporary session expiry to verify fresh acquisition, after VM stop/start, after Provisioning, and after rebuilding and explicit reenrollment. Replace the certificate/key pair and reenroll; try an invalid replacement and confirm the previous usable identity remains active. Exercise expiration recovery and review revocation with the external account administrator using [the AWS guide](./aws-enrollment.md). These manual checks require real trust resources and were not performed by the automated suite.
+
+### AWS acceptance record (2026-10-23)
+
+Implementation environment: Linux, with isolated host/guest homes. No real
+macOS/Lima installation or authorized real AWS/1Password mutation is available.
+**Real acceptance remains unrun.** Automated results below are simulated service
+results with real local OpenSSL certificates, not external acceptance evidence.
+
+Local validation passed: `PATH=/tmp/proteus-spec41-tools/bin:/tmp/proteus-spec41-lima/bin:$PATH env -u T3CODE_HOME make static test`
+completed static checks and **117 tests, zero failures, zero skips**. CI uses the
+same Make targets, with OpenSSL installed explicitly; `make static` parses the
+Python entrypoints/modules/tests and `make test` discovers the lifecycle suite.
+
+`make test` discovers `test_aws_lifecycle.py` alongside the setup, configuration,
+enrollment and Provisioning suites. The lifecycle suite executes the public
+`aws-setup`, `configure` and `enroll aws` commands and real guest helper. It feeds
+setup's emitted values through configuration prompts, resolves the simulated
+persistent workload item, replaces certificates, checks failed issuance/item
+updates/verification/reenrollment preserve prior state, recovers from an expired
+CA-signed workload certificate, and reenrolls into an empty guest enrollment home
+with installed tools. This fresh-home case simulates credential recovery after a
+rebuild; it does not boot or provision a real VM. Helper/AWS requests are simulated
+and do not demonstrate real session refresh or real T3 process behavior.
+
+| Real acceptance case | Status | Reason / evidence to record on macOS |
+| --- | --- | --- |
+| Initial setup and 1Password-backed enrollment | Unrun | Needs authorized real vault/cloud writes and macOS; record resource IDs, certificate expiry, command outcomes without secrets. |
+| Exact AWS account and assumed role | Unrun | Needs real Roles Anywhere trust; record STS account/role ARN. |
+| AWS read from an agent through persistent T3 | Unrun | Needs running macOS/Lima/T3 deployment; record a permitted read without login-shell initialization or exported access keys. |
+| Fresh acquisition after temporary session expiry | Unrun | Needs real issued sessions and elapsed expiry; record session expiry and successful later AWS read with the same valid workload certificate. |
+| VM stop/start | Unrun | No real macOS Lima VM; record identity and agent read before/after stop/start. |
+| Provisioning preserves enrollment | Unrun | Local task fixture only; record identity before/after real `./provision`. |
+| Certificate replacement and failed replacement preservation | Unrun | Local lifecycle fixture only; record changed serial/expiry, unchanged CA/resource ARNs, successful reenrollment, and rejected candidate leaving the prior guest generation active. |
+| Workload expiration recovery | Unrun | Local expired-certificate fixture only; use a controlled test identity, original CA and host administrative access; record renewal and reenrollment outcomes. |
+| Rebuild and explicit reenrollment | Unrun | Empty-home fixture only; record restored tools, no access before enrollment, same account/role and successful agent read afterward without recreating trust. |
+| Emergency revocation and compromised-material recovery | Unrun | Requires external administrator and authorized controlled exercise; verify issuance stops, separately address issued sessions, revoke compromised certificates/replace compromised CA trust before reenablement. |
+| External production/cross-account isolation | Not established | Requires independent organization/trust review; account identity and simulated tests cannot prove it. |
+
+Run the real cases only with an approved isolated development identity. Keep keys,
+SSO tokens, temporary credentials and vault contents out of the acceptance record.
+Use the [setup, replacement and rebuild guide](./aws-setup.md) and
+[AWS Credential Enrollment guide](./aws-enrollment.md) as the operating steps.
+Record actual outcomes and dates here when acceptance is performed; do not mark
+these rows passed from automated fixtures. `make lima-acceptance` checks baseline
+Provisioning only and does not run this AWS matrix.

@@ -134,7 +134,7 @@ def openssl(*arguments):
     return run(["openssl", *arguments], description="OpenSSL " + arguments[0])
 
 
-def validate_pair(directory, prefix, certificate, key, cn, ca=False):
+def validate_pair(directory, prefix, certificate, key, cn, ca=False, allow_expired=False):
     cert_path, key_path = directory / f"{prefix}.pem", directory / f"{prefix}.key"
     write(cert_path, certificate)
     write(key_path, key)
@@ -148,8 +148,15 @@ def validate_pair(directory, prefix, certificate, key, cn, ca=False):
     text = openssl("x509", "-in", cert_path, "-text", "-noout")
     if ("CA:TRUE" if ca else "CA:FALSE") not in text:
         raise SetupError("Stored certificate has incorrect basic constraints.")
-    openssl("x509", "-in", cert_path, "-checkend", "0", "-noout")
-    openssl("verify", "-CAfile", cert_path if ca else directory / "ca.pem", cert_path)
+    if not allow_expired:
+        try:
+            openssl("x509", "-in", cert_path, "-checkend", "0", "-noout")
+        except SetupError:
+            if ca:
+                raise SetupError("Stored CA certificate has expired; restore the original valid CA or plan an explicit trust migration.") from None
+            raise SetupError("Stored workload certificate has expired; run ./aws-setup --renew with the original CA, then ./enroll aws.") from None
+    openssl("verify", *(["-no_check_time"] if allow_expired else []),
+            "-CAfile", cert_path if ca else directory / "ca.pem", cert_path)
     return cert_path, key_path
 
 
@@ -207,6 +214,8 @@ def configure_resources(aws, args, ca_certificate):
     if anchor:
         if anchor["source"] != source or not anchor["enabled"]:
             raise SetupError("Existing trust anchor differs or is disabled; refusing replacement.")
+    elif args.renew:
+        raise SetupError("Renewal requires the existing trust anchor; restore the selected identity, not new trust.")
     else:
         anchor = aws.call("rolesanywhere", "create-trust-anchor", name=args.name, source=source, enabled=True)["trustAnchor"]
     anchor_arn = anchor["trustAnchorArn"]
@@ -226,11 +235,14 @@ def configure_resources(aws, args, ca_certificate):
             policy = json.loads(unquote(policy))
         if role["Arn"] != role_arn or policy != trust:
             raise SetupError("Existing role trust differs; refusing to modify an unrelated role.")
+    elif args.renew:
+        raise SetupError("Renewal requires the existing role; no AWS resources were changed.")
     else:
         aws.call("iam", "create-role", role_name=args.name, assume_role_policy_document=trust)
     # Idempotent attachment also repairs a failure immediately after role creation.
-    aws.call("iam", "attach-role-policy", role_name=args.name,
-             policy_arn="arn:aws:iam::aws:policy/AdministratorAccess")
+    if not args.renew:
+        aws.call("iam", "attach-role-policy", role_name=args.name,
+                 policy_arn="arn:aws:iam::aws:policy/AdministratorAccess")
     profile = aws.named("rolesanywhere", "list-profiles", "profiles", args.name)
     if profile:
         profile = aws.call("rolesanywhere", "get-profile", profile_id=profile["profileId"])["profile"]
@@ -238,6 +250,8 @@ def configure_resources(aws, args, ca_certificate):
                 or profile.get("sessionPolicy") or profile.get("managedPolicyArns")
                 or profile.get("requireInstanceProperties") or profile.get("acceptRoleSessionName")):
             raise SetupError("Existing Roles Anywhere profile differs; refusing replacement.")
+    elif args.renew:
+        raise SetupError("Renewal requires the existing Roles Anywhere profile; no AWS resources were changed.")
     else:
         profile = aws.call("rolesanywhere", "create-profile", name=args.name, role_arns=[role_arn],
                            duration_seconds="3600", enabled=True)["profile"]
@@ -280,6 +294,8 @@ def setup(args):
         if item.document and item.value("proteus identity") not in ("", identity):
             raise SetupError("Selected item belongs to another Proteus identity.")
     existing_workload = bool(workload.value("certificate") or workload.value("private key"))
+    if args.renew and (not existing_workload or not ca.document):
+        raise SetupError("Renewal requires the existing workload pair and protected CA item; restore their backups first.")
     if not existing_workload:
         approve(("Update" if workload.document else "Create") + " selected workload item with a coherent certificate/private-key pair")
     if not ca.document and existing_workload:
@@ -299,10 +315,16 @@ def setup(args):
             if not workload.value("certificate") or not workload.value("private key"):
                 raise SetupError("Existing workload pair is incomplete; restore it or select a new empty item. Renewal is separate.")
             certificate, key = workload.value("certificate"), workload.value("private key")
-            print("Reusing the existing workload pair; no certificate rotation requested.")
-        else:
+            if args.renew:
+                validate_pair(directory, "previous", certificate, key, args.name, allow_expired=True)
+            else:
+                print("Reusing the existing workload pair; no certificate rotation requested.")
+        if not existing_workload or args.renew:
             # Ensure the CA will remain valid for the entire new certificate lifetime.
-            openssl("x509", "-in", directory / "ca.pem", "-checkend", str(365 * 86400), "-noout")
+            try:
+                openssl("x509", "-in", directory / "ca.pem", "-checkend", str(365 * 86400), "-noout")
+            except SetupError:
+                raise SetupError("CA needs at least 365 days remaining; plan an explicit trust migration. No replacement was stored.") from None
             certificate, key = issue(directory, args.name)
         validate_pair(directory, "workload", certificate, key, args.name)
         if not existing_workload:
@@ -310,6 +332,9 @@ def setup(args):
             workload.store(certificate, key, identity)
         role, anchor, profile = configure_resources(aws, args, ca.value("certificate"))
         verify_identity(directory, args, role, anchor, profile)
+        if args.renew:
+            approve("Update selected workload item with the verified replacement certificate/private-key pair")
+            workload.store(certificate, key, identity)
     print("Verified workload AWS account and role. Setup complete; configure and enroll AWS separately.")
     settings = {"proteus_aws_enabled": True, "proteus_aws_account_id": args.account_id,
                 "proteus_aws_role_arn": role, "proteus_aws_region": args.region,
@@ -322,6 +347,8 @@ def setup(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--renew", action="store_true",
+                        help="replace the workload pair using the existing CA and AWS trust (including after expiry)")
     parser.add_argument("--account-id", required=True, help="intended isolated development account")
     parser.add_argument("--admin-profile", required=True, help="explicit authenticated host AWS CLI profile")
     parser.add_argument("--region", required=True)
@@ -349,4 +376,6 @@ def main():
     except (SetupError, OSError, KeyError, TypeError, ValueError) as error:
         message = str(error) if isinstance(error, SetupError) else "Host operation failed; setup is incomplete. Retry with the same references."
         print(f"aws-setup: {message}", file=sys.stderr)
+        if args.renew:
+            print("Renewal incomplete; guest enrollment was not changed. If an item write may have completed, inspect both workload fields before retrying or reenrolling. A preserved expired certificate cannot restore access; renew with the original valid CA, then run ./enroll aws.", file=sys.stderr)
         return 1

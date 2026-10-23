@@ -109,4 +109,4 @@ See [Credential Enrollment](./credentials.md) for authentication details and [Pr
 
 ## Optional AWS access
 
-`./configure` offers an optional complete AWS group; blank answers keep existing values and `false` opts out. Configure an existing IAM Roles Anywhere workload identity, then run `./enroll aws [instance-name]` after Provisioning. See [AWS Credential Enrollment](./aws-enrollment.md) for prerequisites, annual replacement, rebuilding, and emergency revocation. The default profile works through background T3 processes without a service restart.
+`./configure` offers an optional complete AWS group; blank answers keep existing values and `false` opts out. Create an IAM Roles Anywhere workload identity with [`./aws-setup`](./aws-setup.md), or reuse an existing one. Enter the emitted summary values into `./configure` prompts; the summary is YAML, while saved host settings are key=value. Then run `./enroll aws [instance-name]` after Provisioning. See [AWS Credential Enrollment](./aws-enrollment.md) for prerequisites, annual replacement, rebuilding, and emergency revocation. The default profile works through background T3 processes without a service restart.
