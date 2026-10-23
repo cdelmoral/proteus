@@ -1,6 +1,6 @@
 # AWS Credential Enrollment
 
-This workflow starts with an existing workload identity. Arrange an externally isolated development AWS account, a dedicated offline CA, an IAM role, and a Roles Anywhere trust anchor and profile before enrollment. The role may have broad development administration, but production and other-account access must be prevented outside the agent's authority (for example by organization controls and externally managed trust). Enrollment checks the expected identity; it cannot prove production isolation. Never enroll a Production AWS Role or your human SSO session.
+Use [host AWS setup](./aws-setup.md) to create a workload identity, or start with an existing one. Arrange an externally isolated development AWS account, a dedicated offline CA, an IAM role, and a Roles Anywhere trust anchor and profile before enrollment. The role may have broad development administration, but production and other-account access must be prevented outside the agent's authority (for example by organization controls and externally managed trust). Enrollment checks the expected identity; it cannot prove production isolation. Never enroll a Production AWS Role or your human SSO session.
 
 The AWS-side role trust must constrain the dedicated CA and workload certificate identity. Keep the CA signing key in a separate protected 1Password item, never in the workload item, VM, repository, or Provisioning inputs. Store a currently valid PEM workload certificate and its matching unencrypted PEM private key in distinct 1Password fields. Issue workload certificates for one year. The Roles Anywhere profile ARN identifies an AWS resource; it is distinct from the guest's default CLI profile.
 
@@ -30,6 +30,15 @@ The default AWS profile uses an absolute `/usr/local/bin/aws_signing_helper` pat
 
 Reenrollment activates a new coherent generation. Older generations remain private so in-flight clients can finish using paths they have already loaded; delete obsolete `identity-*` directories only after such clients have finished. Provisioning updates tools and Managed Dotfiles without reading references or modifying AWS enrollment files.
 
-For annual replacement, issue a new one-year certificate and matching key on the trusted host, update the selected workload fields together, and run `./enroll aws` before expiry. Keep the CA key separate throughout issuance and clean up protected host temporary material. After expiry, issue a replacement and reenroll using the same AWS trust resources. Failed rotation leaves the previous setup active but cannot extend an expired certificate. After rebuilding, provision and reenroll the existing workload references; stop/start retains credentials.
+For annual replacement or recovery after workload expiration, run
+`./aws-setup --renew` with the same account, administrative profile, region, name
+and workload/CA references, then `./enroll aws [instance-name]`. Follow the
+[replacement and recovery procedure](./aws-setup.md#annual-replacement-and-expiration-recovery).
+Renewal verifies the new pair before offering a coherent workload-item update;
+it preserves CA and AWS trust and does not change the guest. Failed reenrollment
+preserves the previous generation but cannot extend an expired certificate.
+After rebuilding, follow the [rebuild checklist](./aws-setup.md#rebuild-checklist)
+and reenroll from the persistent workload item; new trust setup is unnecessary.
+VM stop/start retains credentials.
 
 For compromise, use a trusted administrative host identity to disable the Roles Anywhere profile or trust anchor, or revoke the certificate through an applicable Roles Anywhere CRL, to stop new issuance. Separately revoke active sessions for the IAM role and assess already performed actions; disabling issuance alone does not invalidate existing temporary sessions immediately. See AWS's [Roles Anywhere revocation guidance](https://docs.aws.amazon.com/rolesanywhere/latest/userguide/trust-model.html) and [revoking role sessions](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_revoke-sessions.html). Rotate the compromised workload key and update/reenroll the selected item; a compromised CA requires replacing trust as well. Deleting the VM or updating 1Password does not invalidate extracted credentials. Do not use guest administration as proof that emergency isolation is enforced.
