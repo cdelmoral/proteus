@@ -142,3 +142,10 @@ See [host configuration](./usage.md#host-configuration) to select the GitHub tok
 ## AWS
 
 Use explicit [AWS Credential Enrollment](./aws-enrollment.md) for a selected IAM Roles Anywhere workload certificate and private key. Human AWS SSO credentials remain on the host; production isolation must be enforced externally.
+
+AWS annual replacement uses [`./aws-setup --renew`](./aws-setup.md#annual-replacement-and-expiration-recovery)
+on the trusted host with the separately protected CA, followed by explicit
+`./enroll aws [instance-name]`. This also recovers an expired workload certificate
+without replacing trust. See the same guide for CA backup, rebuild and emergency
+revocation; updating the workload item alone does not activate a guest or revoke
+extracted keys or previously issued sessions.

@@ -74,6 +74,8 @@ if tool == 'op':
         else:
             assert args[2] == document['id']
             items[:] = [document if i['id'] == document['id'] else i for i in items]
+            if state.get('op_failure_after_edit'):
+                state['op_failure'] = 'get'
         done(document)
     raise AssertionError(args)
 if tool == 'aws':
@@ -106,7 +108,7 @@ if tool == 'aws':
         done({collection: state.get(collection, [])})
     if operation == 'create-trust-anchor':
         value = {'name': option('name'), 'source': json.loads(option('source')), 'enabled': True,
-                 'trustAnchorArn': 'arn:aws:rolesanywhere:us-east-1:123456789012:trust-anchor/anchor1'}
+                 'trustAnchorArn': 'arn:aws:rolesanywhere:us-east-1:123456789012:trust-anchor/12345678-1234-1234-1234-123456789abc'}
         state['trustAnchors'] = [value]
         done({'trustAnchor': value})
     if operation == 'create-role':
@@ -120,7 +122,7 @@ if tool == 'aws':
         done(None)
     if operation == 'create-profile':
         value = {'name': option('name'), 'profileId': 'profile1', 'roleArns': json.loads(option('role-arns')),
-                 'enabled': True, 'profileArn': 'arn:aws:rolesanywhere:us-east-1:123456789012:profile/profile1'}
+                 'enabled': True, 'profileArn': 'arn:aws:rolesanywhere:us-east-1:123456789012:profile/12345678-1234-1234-1234-123456789abc'}
         state['profiles'] = [value]
         done({'profile': value})
     if operation == 'get-profile':
@@ -161,8 +163,8 @@ class AWSSetupTest(unittest.TestCase):
         path = self.home / "requests.jsonl"
         return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
 
-    def setup(self, responses=REFERENCES + "yes\nyes\n", success=True):
-        result = subprocess.run(COMMAND, input=responses, capture_output=True, text=True,
+    def setup(self, responses=REFERENCES + "yes\nyes\n", success=True, renew=False):
+        result = subprocess.run(COMMAND + (["--renew"] if renew else []), input=responses, capture_output=True, text=True,
                                 env=self.environment, timeout=30)
         if success:
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -215,7 +217,7 @@ class AWSSetupTest(unittest.TestCase):
         trust = self.state()["Roles"][0]["AssumeRolePolicyDocument"]["Statement"][0]
         self.assertEqual(set(trust["Action"]), {"sts:AssumeRole", "sts:TagSession", "sts:SetSourceIdentity"})
         self.assertEqual(trust["Condition"]["StringEquals"]["aws:PrincipalTag/x509Subject/CN"], "proteus")
-        self.assertIn("anchor1", trust["Condition"]["ArnEquals"]["aws:SourceArn"])
+        self.assertIn("12345678-1234-1234-1234-123456789abc", trust["Condition"]["ArnEquals"]["aws:SourceArn"])
         requests = self.requests()
         self.assertIn("get-caller-identity", requests[0][1])
         self.assertTrue(any(tool == "aws_signing_helper" for tool, _ in requests))
