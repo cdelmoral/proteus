@@ -36,6 +36,7 @@ Keep repositories under `~/projects` inside the guest. Deleting the VM during a 
 
 - [Usage](./docs/usage.md): requirements, host configuration, daily commands, Git identity, and rebuilding
 - [Credentials](./docs/credentials.md): GitHub, Claude Code, T3, Salesforce, and Teamwork Graph enrollment
+- [AWS workload setup](./docs/aws-setup.md): host-side identity setup and credential custody
 - [Provisioning](./docs/provisioning.md): installed tools, updates, dotfiles, and what a rebuild restores
 - [Testing](./docs/testing.md): automated checks and manual acceptance
 - [VM details](./vm/README.md): isolation, Docker privileges, and port forwarding
