@@ -1,0 +1,169 @@
+# Host AWS workload setup
+
+`./aws-setup` creates a dedicated IAM Roles Anywhere workload identity on the
+trusted host. It never contacts Lima or enrolls a guest. Provisioning and AWS
+Credential Enrollment remain separate operations.
+
+## Prerequisites and isolation
+
+Install Python 3.9 or newer, OpenSSL (including `genpkey`), AWS CLI v2,
+1Password CLI v2 (`op`), and the official macOS `aws_signing_helper` on the host
+PATH. Obtain the helper from AWS's [credential helper documentation](https://docs.aws.amazon.com/rolesanywhere/latest/userguide/credential-helper.html)
+and verify the published checksum. Sign in to 1Password normally; its CLI handles
+unlocking and account selection. Create the destination vaults beforehand.
+
+Use a dedicated development account whose isolation from production and other
+accounts is enforced outside the workload administrator's control. An account
+identity check, the selected CLI profile, or a policy the administrator can remove
+does not establish this boundary. Review organization controls and cross-account
+trust/escalation paths separately. Building organization-wide isolation is out of
+scope. Do not proceed in a production account.
+
+Select an existing host administrative AWS CLI profile explicitly. It needs STS
+identity lookup, IAM role listing/creation and policy attachment, and Roles
+Anywhere trust-anchor/profile listing, creation and profile lookup. It may use
+human SSO: authenticate on the host first, for example with
+`aws sso login --profile development-admin`. Human credentials and SSO caches
+never enter Proteus. Setup ignores ambient AWS credential and endpoint variables;
+only `AWS_CONFIG_FILE` and `AWS_SHARED_CREDENTIALS_FILE` are retained for locating
+the explicitly selected administrative profile. Profile configuration itself is
+trusted host input; do not use profiles with custom cloud endpoints.
+
+## Run setup
+
+```bash
+./aws-setup --account-id 123456789012 \
+  --admin-profile development-admin --region us-east-1
+```
+
+The default dedicated resource name and workload certificate CN are `proteus`.
+`--name` selects another name (1–48 letters, numbers, underscores or hyphens).
+Use the same account, region, name and item references for retries. This command
+supports the commercial `aws` partition. Run one setup at a time for an identity.
+
+1. Setup verifies the administrative identity's account before any AWS or vault
+   mutation. Confirm that external isolation controls are in place.
+2. Enter the intended workload reference, such as
+   `op://Development/Proteus AWS/certificate`. Setup uses sibling fields
+   `certificate` and `private key`; sectioned references are not supported.
+3. Enter a separate protected CA item reference, such as
+   `op://Protected/Proteus AWS CA/certificate`. Restrict that vault/item to trusted
+   host operators. Setup cannot configure or prove 1Password access controls.
+4. Accept creation of the workload item, or update of an existing empty item.
+   Reference selection always precedes the storage offer. An existing complete
+   pair is validated and reused without updates. Setup does not replace an
+   existing certificate, rotate a key, or implement renewal.
+5. If the CA item is absent, explicitly accept creation. Its ten-year self-signed
+   EC P-256 CA has certificate-signing/CRL-signing usage and a path-length limit
+   of zero. Setup stores it in the protected item and reads it back before any
+   AWS resource creation. Existing CAs are validated and reused; missing keys,
+   invalid certificates, ambiguous/archived items and mismatched identities stop
+   setup. An existing workload with a missing CA stops setup rather than
+   generating a replacement CA.
+6. Setup signs a matching EC P-256 workload pair for 365 days, with X.509v3
+   `CA:FALSE`, digital-signature key usage and SHA-256 signing. The CA must remain
+   valid throughout issuance. Both workload fields are written together in one
+   item operation and read back before AWS changes. Existing unrelated item
+   fields are preserved. Existing items must be Secure Notes; other categories
+   are rejected, since 1Password JSON-template edits can overwrite passkeys.
+7. Setup creates the trust anchor, dedicated role and Roles Anywhere profile.
+   The role grants AdministratorAccess and trusts the Roles Anywhere service
+   with `AssumeRole`, `SetSourceIdentity` and `TagSession`, constrained by the
+   exact trust-anchor ARN, account and workload CN. The enabled Roles Anywhere
+   profile lists only this role and requests one-hour sessions. Existing
+   resources are reused only when compatible; differing or disabled resources
+   are rejected without changing their trust, CA or profile. Reattaching the
+   administrator policy repairs retries after role creation.
+8. Setup verifies the workload through the host helper and STS, checking the
+   exact account and assumed role. This verification uses a private temporary
+   default profile with `credential_process`, an empty credentials file, no
+   ambient AWS variables and no instance metadata credentials. It cannot pass
+   by falling back to the administrative profile. IAM propagation delays can
+   cause initial verification to fail: retry with the same references.
+
+Declining storage exits unsuccessfully before issuance or cloud changes. Partial
+external failure is reported as incomplete and does not emit enrollment settings.
+Existing pairs/resources are retained so the same command can resume. Already
+successful AWS or vault writes are not rolled back. If a write's result is lost,
+inspect the selected item/resource before retrying; setup lists existing items
+rather than interpreting an authentication failure as an absent item. If duplicate
+names exist, select a unique item ID or resolve duplicate AWS names manually.
+A damaged workload pair requires restoration or a separately selected empty item;
+setup never silently repairs it by replacing the private key.
+
+## Settings handed to configuration
+
+Only after successful workload verification, setup prints the following YAML
+mapping, using JSON-quoted strings (valid YAML). It writes no repository,
+Provisioning or enrollment configuration and never changes VM lifecycle:
+
+```yaml
+proteus_aws_enabled: true
+proteus_aws_account_id: "123456789012"
+proteus_aws_role_arn: "arn:aws:iam::123456789012:role/proteus"
+proteus_aws_region: "us-east-1"
+proteus_aws_trust_anchor_arn: "arn:aws:rolesanywhere:us-east-1:123456789012:trust-anchor/ANCHOR_ID"
+proteus_aws_profile_arn: "arn:aws:rolesanywhere:us-east-1:123456789012:profile/PROFILE_ID"
+proteus_aws_certificate_ref: "op://VAULT_ID/WORKLOAD_ITEM_ID/certificate"
+proteus_aws_private_key_ref: "op://VAULT_ID/WORKLOAD_ITEM_ID/private key"
+```
+
+The resource ARNs identify the AWS-side trust anchor and Roles Anywhere profile;
+that profile is distinct from a guest's default AWS CLI profile. Use the complete
+mapping when configuring AWS Credential Enrollment. The protected CA reference
+is deliberately absent. Only the two selected workload fields belong in
+enrollment. Keep the complete workload pair in 1Password after a VM rebuild,
+then explicitly reenroll it; rebuilding does not require new AWS trust.
+
+## Custody, failure recovery and lifecycle
+
+Certificate/key material is handled in process memory, private host temporary
+files (directory mode 0700, file mode 0600), and 1Password stdin/stdout pipes.
+Private keys are never command arguments, forwarded environment variables,
+repository files, or terminal output. Subprocess diagnostics are suppressed
+because they may echo secrets. Temporary files are removed on success, exceptions,
+Ctrl-C and SIGTERM. An uncatchable termination or host crash can leave material
+under the host temporary directory as `proteus-aws-*`; remove it securely after
+checking that no setup is running. File removal does not guarantee physical disk
+erasure; trust the host's disk encryption and temporary-storage protections.
+
+Preserve a recoverable, access-controlled backup of the CA item and its matching
+certificate/private key. Restore the same item after loss or accidental archival.
+Never substitute a newly generated CA into an existing trust anchor as a retry.
+If the CA is irrecoverable, plan an explicit trust migration with a new identity;
+existing workload credentials may still function until certificate expiry or
+revocation, but no replacement can be signed with the lost key.
+
+The workload certificate lasts one year. Arrange certificate replacement and
+reenrollment before expiry; this initial-setup command has no renewal mode.
+An expired or invalid existing pair fails rather than rotating it. Recovery after
+expiry requires host-side issuance with the original CA, a coherent workload-item
+update, and explicit reenrollment through the replacement procedure. Temporary
+role-session refresh is provided by the AWS helper while certificates/trust remain
+valid; it is distinct from certificate renewal.
+
+For emergency response, disable the Roles Anywhere trust anchor/profile or remove
+the role trust to stop new issuance, and address already issued role sessions
+using AWS's [role-session revocation procedure](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_revoke-sessions.html).
+Imported CRLs can revoke a specific certificate; AWS does not use OCSP or CRL
+URLs for these checks. Replacing the vault item, deleting the VM, or stopping new
+issuance does not by itself immediately invalidate existing sessions or extracted
+key copies. A compromised CA affects every certificate it signed and requires
+explicit trust replacement. Setup itself performs no revocation operations.
+
+## Validation and primary references
+
+Run `python3 -B -m unittest discover -s tests -p test_aws_setup.py`. Tests execute
+`./aws-setup` with isolated homes, simulated AWS/1Password/helper boundaries and
+real OpenSSL issuance/validation. They do not change real AWS or 1Password data.
+Real macOS AWS/1Password acceptance, actual credential acquisition, and external
+organization isolation remain operator acceptance work.
+
+Implementation follows AWS's [trust model](https://docs.aws.amazon.com/rolesanywhere/latest/userguide/trust-model.html),
+[CreateTrustAnchor API](https://docs.aws.amazon.com/cli/latest/reference/rolesanywhere/create-trust-anchor.html),
+[CreateProfile API](https://docs.aws.amazon.com/cli/latest/reference/rolesanywhere/create-profile.html),
+and [credential helper](https://docs.aws.amazon.com/rolesanywhere/latest/userguide/credential-helper.html),
+plus 1Password's [item creation](https://www.1password.dev/cli/item-create)
+and [item editing reference](https://www.1password.dev/cli/reference/management-commands/item#item-edit)
+(checked October 23, 2026). AWS account checks and resource trust restrictions
+provide useful safeguards, not proof of external production isolation.
