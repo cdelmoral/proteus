@@ -17,6 +17,9 @@ baseline_system_packages:
   - jq
   - neovim
   - openssh-client
+  - openssl
+  - groff
+  - less
   - pipx
   - python3
   - python3-venv
@@ -93,3 +96,15 @@ third_party_apt_repositories:
     suite: stable
     component: main
     architecture: arm64
+
+# AWS CLI archive was verified against AWS's detached PGP signature before
+# recording this digest. See docs/provisioning.md for primary sources.
+aws_cli_version: "2.38.5"
+aws_cli_download_url: "https://awscli.amazonaws.com/awscli-exe-linux-aarch64-{{ aws_cli_version }}.zip"
+aws_cli_checksum: "sha256:07711a936e9d271045ab937d2c2c5390c25f419e4ba9e25adb9e996031e3f6be"
+aws_cli_extract_dir: "{{ ansible_facts.user_dir }}/.cache/proteus/aws-cli-{{ aws_cli_version }}"
+aws_helper_version: "1.8.5"
+aws_helper_download_url: >-
+  https://rolesanywhere.amazonaws.com/releases/{{ aws_helper_version }}/Aarch64/Linux/Amzn2023/aws_signing_helper
+aws_helper_checksum: "sha256:3d131aa888cd56da446f9c6bb460b1f0569f6c7edc74eae6193a2fe3928883ba"
+aws_helper_install_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/aws-helper/{{ aws_helper_version }}"

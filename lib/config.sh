@@ -90,9 +90,34 @@ proteus_save_config() {
   local reference="$1"
   local salesforce_login_url="$2"
   local signing_reference="$3"
+  shift 3
 
   _proteus_save_config_values \
     "$_proteus_github_reference_key" "$reference" \
     "$_proteus_signing_reference_key" "$signing_reference" \
-    "$_proteus_salesforce_login_url_key" "$salesforce_login_url"
+    "$_proteus_salesforce_login_url_key" "$salesforce_login_url" "$@"
+}
+
+# Shared contract with host-side setup. Values are data, never sourced as shell.
+# shellcheck disable=SC2034 # Public contract consumed by configure and enroll.
+proteus_aws_keys=(proteus_aws_account_id proteus_aws_role_arn proteus_aws_region
+  proteus_aws_trust_anchor_arn proteus_aws_profile_arn
+  proteus_aws_certificate_ref proteus_aws_private_key_ref)
+
+proteus_config_value() {
+  if [[ -f "$_proteus_config_file" ]]; then
+    _proteus_config_value "$_proteus_config_file" "$1"
+  fi
+}
+
+proteus_valid_aws_config() {
+  local account="$1" role="$2" region="$3" anchor="$4" profile="$5" cert="$6" key="$7"
+  local uuid='[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}'
+  [[ "$account" =~ ^[0-9]{12}$ &&
+     "$role" =~ ^arn:aws:iam::${account}:role/([A-Za-z0-9_+=,.@-]+/)*[A-Za-z0-9_+=,.@-]{1,64}$ &&
+     "$region" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ &&
+     "$anchor" =~ ^arn:aws:rolesanywhere:${region}:${account}:trust-anchor/${uuid}$ &&
+     "$profile" =~ ^arn:aws:rolesanywhere:${region}:${account}:profile/${uuid}$ &&
+     "$cert" =~ ^op://[^/]+/[^/]+/.+$ && "$key" =~ ^op://[^/]+/[^/]+/.+$ && "$cert" != "$key" &&
+     "$cert$key" != *$'\n'* && "$cert$key" != *$'\r'* ]]
 }

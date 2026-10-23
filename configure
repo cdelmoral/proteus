@@ -43,6 +43,31 @@ if ! proteus_valid_salesforce_login_url "$login_url"; then
   exit 1
 fi
 
-config_file="$(proteus_save_config "$reference" "$login_url" "$signing_reference")"
+current_aws_enabled="$(proteus_config_value proteus_aws_enabled)"
+printf 'Enable AWS Credential Enrollment? [true/false; %s]: ' "${current_aws_enabled:-false}"
+IFS= read -r aws_enabled || true
+aws_enabled="${aws_enabled:-${current_aws_enabled:-false}}"
+if [[ "$aws_enabled" != true && "$aws_enabled" != false ]]; then
+  printf 'AWS enabled must be true or false.\n' >&2
+  exit 1
+fi
+aws_pairs=(proteus_aws_enabled "$aws_enabled")
+aws_values=()
+if [[ "$aws_enabled" == true ]]; then
+  for key in "${proteus_aws_keys[@]}"; do
+    current="$(proteus_config_value "$key")"
+    printf '%s [%s]: ' "$key" "$current"
+    IFS= read -r value || true
+    value="${value:-$current}"
+    aws_values+=("$value")
+    aws_pairs+=("$key" "$value")
+  done
+  if ! proteus_valid_aws_config "${aws_values[@]}"; then
+    printf 'AWS configuration must be complete, with matching account/region ARNs and distinct op:// workload references.\n' >&2
+    exit 1
+  fi
+fi
 
-printf 'Saved the GitHub credential sources and Salesforce login URL to %s.\n' "$config_file"
+config_file="$(proteus_save_config "$reference" "$login_url" "$signing_reference" "${aws_pairs[@]}")"
+
+printf 'Saved the credential sources and non-secret configuration to %s.\n' "$config_file"

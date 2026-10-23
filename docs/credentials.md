@@ -31,7 +31,7 @@ New interactive Bash sessions continue to read the file and export `GH_TOKEN`. P
 
 If Git or GitHub CLI commands in T3 cannot authenticate after switching to its background service, apply the updated Managed Dotfiles and launcher with `./provision` from macOS. Run `./enroll github` if the guest has not enrolled its GitHub token, then retry the command in T3. No T3 service restart is required.
 
-The guest receives only these selected Host-Injected Credentials. It cannot invoke 1Password, browse the vault, or retrieve another host credential. Continue to create AWS, cloud, OpenCode, T3 Code, Salesforce, and other credentials inside the guest only when needed.
+The guest receives only these selected Host-Injected Credentials. It cannot invoke 1Password, browse the vault, or retrieve another host credential. Continue to create cloud, OpenCode, T3 Code, Salesforce, and other credentials inside the guest only when needed.
 
 ## Claude Code
 
@@ -138,3 +138,7 @@ sf org open --target-org my-scratch --url-only
 `sf org logout` removes only the guest-local authorization; it does not revoke the OAuth token in Salesforce. Before deleting the VM, delete scratch orgs you no longer need with `sf org delete scratch`, then revoke the VM's Salesforce CLI access in the Dev Hub User's personal settings under OAuth Connected Apps. See [rebuilding Proteus](./usage.md#rebuild-proteus).
 
 See [host configuration](./usage.md#host-configuration) to select the GitHub token source and Salesforce login URL, and [VM details](../vm/README.md#isolation-boundary) for the isolation boundary.
+
+## AWS
+
+Use explicit [AWS Credential Enrollment](./aws-enrollment.md) for a selected IAM Roles Anywhere workload certificate and private key. Human AWS SSO credentials remain on the host; production isolation must be enforced externally.
