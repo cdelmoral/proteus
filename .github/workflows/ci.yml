@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - ".github/**"
+      - "aws-setup"
       - "configure"
       - "dotfiles/**"
       - "enroll"
@@ -20,6 +21,7 @@ on:
       - master
     paths:
       - ".github/**"
+      - "aws-setup"
       - "configure"
       - "dotfiles/**"
       - "enroll"
