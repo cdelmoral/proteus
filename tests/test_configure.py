@@ -35,7 +35,8 @@ class ConfigureTest(unittest.TestCase):
         self.assertIn("e.g. op://vault/item/private key", result.stdout)
         expected = (f"github_token_1password_reference={token}\n"
                     f"git_signing_key_1password_reference={signing_key}\n"
-                    "salesforce_login_url=https://login.salesforce.com\n")
+                    "salesforce_login_url=https://login.salesforce.com\n"
+                    "proteus_aws_enabled=false\n")
         self.assertEqual(self.configuration.read_text(), expected)
         self.assertEqual(self.configuration.stat().st_mode & 0o777, 0o600)
         repeated = self.configure("\n\n")
@@ -52,7 +53,8 @@ class ConfigureTest(unittest.TestCase):
         self.assertEqual(self.configuration.read_text(),
                          "github_token_1password_reference=op://vault/GitHub/token\n"
                          "git_signing_key_1password_reference=op://vault/Signing/private key\n"
-                         "salesforce_login_url=https://login.salesforce.com\n")
+                         "salesforce_login_url=https://login.salesforce.com\n"
+                    "proteus_aws_enabled=false\n")
 
     def test_adding_signing_key_preserves_salesforce_url_and_unrelated_config(self):
         self.configuration.parent.mkdir(parents=True)
@@ -67,6 +69,7 @@ class ConfigureTest(unittest.TestCase):
         self.assertEqual(sorted(self.configuration.read_text().splitlines()), [
             "git_signing_key_1password_reference=op://vault/Signing/private key",
             "github_token_1password_reference=op://vault/GitHub/token",
+            "proteus_aws_enabled=false",
             "salesforce_login_url=https://example.my.salesforce.com",
             "unrelated_setting=keep-me",
         ])

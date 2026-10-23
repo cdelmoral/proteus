@@ -63,3 +63,7 @@ _Avoid_: T3 login, provider enrollment
 **Teamwork Graph Enrollment**:
 The explicit authorization of Proteus to access Jira and Confluence through Teamwork Graph CLI using a VM-Local Credential for the owner's personal Atlassian identity.
 _Avoid_: Atlassian credential provisioning, agent account enrollment
+
+**AWS Credential Enrollment**:
+The explicit enrollment of a selected workload certificate and private key as Host-Injected Credentials for access to one isolated development AWS account.
+_Avoid_: AWS SSO login, credential provisioning, AWS key import

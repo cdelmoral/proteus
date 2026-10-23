@@ -106,3 +106,7 @@ limactl shell proteus
 Then clone your repositories and repeat any other Credential Enrollment. This restores the Development Baseline and the selected GitHub token and signing key, not the rest of the deleted VM's contents. Reusing the signing key preserves its existing GitHub registration.
 
 See [Credential Enrollment](./credentials.md) for authentication details and [Provisioning](./provisioning.md) for the Development Baseline.
+
+## Optional AWS access
+
+`./configure` offers an optional complete AWS group; blank answers keep existing values and `false` opts out. Configure an existing IAM Roles Anywhere workload identity, then run `./enroll aws [instance-name]` after Provisioning. See [AWS Credential Enrollment](./aws-enrollment.md) for prerequisites, annual replacement, rebuilding, and emergency revocation. The default profile works through background T3 processes without a service restart.

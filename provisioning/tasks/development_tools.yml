@@ -192,3 +192,6 @@
 
 - name: Install Teamwork Graph CLI and agent skills
   ansible.builtin.import_tasks: teamwork_graph.yml
+
+- name: Install AWS tooling
+  ansible.builtin.import_tasks: aws.yml

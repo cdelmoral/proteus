@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+"""Stage, verify, and atomically activate a Host-Injected AWS workload pair."""
+import configparser
+import datetime
+import fcntl
+import json
+import os
+from pathlib import Path
+import shlex
+import shutil
+import subprocess
+import sys
+import tempfile
+
+
+def run(args, env=None):
+    return subprocess.run(args, env=env, stdin=subprocess.DEVNULL,
+                          capture_output=True, check=True, timeout=90).stdout
+
+
+def config(path):
+    result = configparser.RawConfigParser()
+    result.read(path)
+    return result
+
+
+def write_config(value, path):
+    with path.open('w') as stream:
+        value.write(stream)
+
+
+def enroll():
+    os.umask(0o077)
+    fields = sys.stdin.buffer.read(1024 * 1024).split(b'\0')
+    if len(fields) != 8 or fields[-1]:
+        raise ValueError('Incomplete credential transfer. Retry enrollment.')
+    account, role, region, anchor, profile, certificate, key = [
+        field.decode() for field in fields[:-1]]
+    home = Path.home()
+    aws_dir = home / '.aws'
+    aws_dir.mkdir(mode=0o700, exist_ok=True)
+    # Serialize our own rotations; an in-flight process can keep using its old
+    # immutable generation. Retain old generations until explicit cleanup.
+    with (aws_dir / '.proteus-enrollment.lock').open('w') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        shared_credentials = config(aws_dir / 'credentials')
+        if shared_credentials.has_section('default') and shared_credentials.items('default'):
+            raise ValueError('Remove or relocate default shared credentials before AWS enrollment; they override credential_process.')
+        state = home / '.local/share/proteus/aws'
+        state.mkdir(parents=True, mode=0o700, exist_ok=True)
+        state.chmod(0o700)
+        candidate = Path(tempfile.mkdtemp(prefix='identity-', dir=state))
+        temporary_config = None
+        activated = False
+        try:
+            cert_path, key_path = candidate / 'certificate.pem', candidate / 'private-key.pem'
+            cert_path.write_text(certificate)
+            key_path.write_text(key)
+            try:
+                dates = run(['openssl', 'x509', '-in', str(cert_path), '-noout', '-dates']).decode()
+                validity = dict(line.split('=', 1) for line in dates.splitlines())
+                now = datetime.datetime.now(datetime.timezone.utc)
+                parse_date = lambda value: datetime.datetime.strptime(value, '%b %d %H:%M:%S %Y %Z').replace(tzinfo=datetime.timezone.utc)
+                if not parse_date(validity['notBefore']) <= now < parse_date(validity['notAfter']):
+                    raise ValueError()
+                public_cert = run(['openssl', 'x509', '-in', str(cert_path), '-noout', '-pubkey'])
+                public_key = run(['openssl', 'pkey', '-in', str(key_path), '-passin', 'pass:', '-pubout'])
+                if public_cert != public_key:
+                    raise ValueError()
+            except (ValueError, KeyError, subprocess.SubprocessError):
+                raise ValueError('A currently valid PEM certificate and matching unencrypted private key are required.') from None
+            # Fixed system paths are installed by Provisioning, independent of
+            # login-shell startup and the T3 process's inherited environment.
+            command = ['/usr/local/bin/aws_signing_helper', 'credential-process',
+                       '--certificate', str(cert_path), '--private-key', str(key_path),
+                       '--trust-anchor-arn', anchor, '--profile-arn', profile,
+                       '--role-arn', role, '--region', region]
+            candidate_config = configparser.RawConfigParser()
+            candidate_config['default'] = {'region': region,
+                'credential_process': shlex.join(command)}
+            candidate_path = candidate / 'config'
+            write_config(candidate_config, candidate_path)
+            empty_credentials = candidate / 'credentials'
+            empty_credentials.touch()
+            environment = {k: v for k, v in os.environ.items() if not k.startswith('AWS_') and k != 'BOTO_CONFIG'}
+            environment.update(AWS_CONFIG_FILE=str(candidate_path),
+                               AWS_SHARED_CREDENTIALS_FILE=str(empty_credentials),
+                               AWS_EC2_METADATA_DISABLED='true', AWS_PAGER='',
+                               AWS_DEFAULT_REGION=region)
+            try:
+                identity = json.loads(run(['/usr/local/bin/aws', 'sts', 'get-caller-identity', '--output', 'json'], environment))
+                expected = f'arn:aws:sts::{account}:assumed-role/{role.rsplit("/", 1)[-1]}/'
+                if identity.get('Account') != account or not identity.get('Arn', '').startswith(expected) or not identity['Arn'][len(expected):]:
+                    raise ValueError()
+            except (ValueError, KeyError, subprocess.SubprocessError):
+                raise ValueError('Candidate AWS credentials could not verify the expected account and role. Check certificate, trust, network, and configured ARNs.') from None
+            installed = config(aws_dir / 'config')
+            # Replace only the owned default identity. Keep unrelated options
+            # and all named profiles. Competing default identity sources must go.
+            if installed.has_section('default'):
+                for option in ('aws_access_key_id', 'aws_secret_access_key', 'aws_session_token',
+                               'role_arn', 'source_profile', 'credential_source', 'web_identity_token_file',
+                               'sso_session', 'sso_start_url', 'sso_region', 'sso_account_id', 'sso_role_name',
+                               'endpoint_url', 'services'):
+                    installed.remove_option('default', option)
+            else:
+                installed.add_section('default')
+            for option, value in candidate_config['default'].items():
+                installed.set('default', option, value)
+            fd, name = tempfile.mkstemp(prefix='.proteus-config-', dir=aws_dir)
+            os.close(fd)
+            temporary_config = Path(name)
+            write_config(installed, temporary_config)
+            os.replace(temporary_config, aws_dir / 'config')
+            activated = True
+        finally:
+            if temporary_config:
+                temporary_config.unlink(missing_ok=True)
+            if not activated:
+                shutil.rmtree(candidate)
+
+
+if __name__ == '__main__':
+    try:
+        enroll()
+    except ValueError as error:
+        print(f'{error} Previous AWS enrollment was not changed.', file=sys.stderr)
+        sys.exit(1)
+    except Exception:
+        # Never relay external output or data-bearing exception messages.
+        print('AWS enrollment failed. Check guest prerequisites and file permissions; previous enrollment was not changed.', file=sys.stderr)
+        sys.exit(1)

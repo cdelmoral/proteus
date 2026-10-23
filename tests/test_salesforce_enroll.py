@@ -215,6 +215,7 @@ else:
         self.assertEqual(sorted(self.configuration.read_text().splitlines()), [
             "git_signing_key_1password_reference=op://test/Signing/private key",
             "github_token_1password_reference=op://test/GitHub/rotated",
+            "proteus_aws_enabled=false",
             "salesforce_login_url=https://other.my.salesforce.com",
         ])
 
