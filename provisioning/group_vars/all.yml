@@ -50,13 +50,12 @@ development_npm_packages:
     command: pnpm
   - package: t3
     command: t3
-  # The Managed Dotfiles sf launcher runs this link with fixed settings.
-  - package: "@salesforce/cli"
-    command: sf
-    link: "{{ salesforce_cli_dir }}/sf"
 
 claude_distribution_url: https://downloads.claude.ai/claude-code-releases
 claude_install_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/claude"
+
+salesforce_manifest_url: >-
+  https://developer.salesforce.com/media/salesforce-cli/sf/channels/stable/sf-linux-arm64-buildmanifest
 
 salesforce_cli_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/salesforce-cli"
 

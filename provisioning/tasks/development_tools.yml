@@ -15,7 +15,6 @@
     - "{{ ansible_facts.user_dir }}/.config/mise"
     - "{{ ansible_facts.user_dir }}/.local/bin"
     - "{{ mise_install_dir }}"
-    - "{{ salesforce_cli_dir }}"
 
 - name: Download the pinned mise binary
   ansible.builtin.get_url:
@@ -120,12 +119,8 @@
 - name: Install standalone OpenCode and migrate the old npm installation
   ansible.builtin.import_tasks: opencode.yml
 
-- name: Link the managed Node runtime for the Salesforce CLI launcher
-  ansible.builtin.file:
-    src: "{{ managed_node.stdout | trim }}/bin/node"
-    dest: "{{ salesforce_cli_dir }}/node"
-    state: link
-    force: true
+- name: Install standalone Salesforce CLI
+  ansible.builtin.import_tasks: salesforce.yml
 
 - name: Install standalone Claude Code and its public skills
   ansible.builtin.import_tasks: claude.yml

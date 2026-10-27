@@ -54,3 +54,10 @@ mise's Node installations. It launches even when a project's requested Node is
 missing. Its launcher disables independent auto-updates without changing PATH,
 so project subprocesses retain the caller's Node selection. Run `./provision`
 to update OpenCode; see [Provisioning](./provisioning.md) for migration details.
+
+Salesforce CLI is installed from its official Linux ARM64 standalone archive,
+with its own bundled Node runtime. The managed `sf` command works through the
+system PATH without shell initialization or an installed project Node. It keeps
+the caller's PATH for project subprocesses. Provisioning selects current stable
+releases and disables independent automatic updates; migration removes only the
+previous managed npm installation and runtime links, preserving Salesforce state.

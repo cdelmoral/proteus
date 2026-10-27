@@ -16,9 +16,9 @@ GUEST_FILES = (
     ".local/bin/proteus-enroll-salesforce",
     ".local/bin/proteus-capture-browser-url",
 )
-# Provisioning links the npm-installed CLI and managed Node beneath the sf launcher.
-CLI = ".local/share/proteus/salesforce-cli/sf"
-NODE = ".local/share/proteus/salesforce-cli/node"
+# Provisioning installs the standalone archive beneath the sf launcher.
+CLI = ".local/share/proteus/salesforce-cli/current/bin/run.js"
+NODE = ".local/share/proteus/salesforce-cli/current/bin/node"
 TOKEN = "sensitive-access-token"
 DEFAULT_URL = "https://login.salesforce.com"
 MY_DOMAIN = "https://example.my.salesforce.com"
@@ -34,9 +34,10 @@ class SalesforceEnrollmentTest(EnrollmentHarness):
         self.environment["TEST_SF_LOG"] = str(self.cli_log)
         self.write_command(self.guest / NODE, """
 import os, sys
-os.execv(sys.argv[1], sys.argv[1:])
+assert sys.argv[1] == "--no-deprecation"
+os.execv(sys.argv[2], sys.argv[2:])
 """)
-        # Only managed Node and the npm-installed CLI are simulated. Like the open package,
+        # Only the bundled Node and CLI are simulated. Like the open package,
         # login runs BROWSER detached with output discarded.
         self.write_command(self.guest / CLI, f"""
 import json, os, pathlib, subprocess, sys
@@ -50,7 +51,7 @@ if args[:3] == ['org', 'login', 'web']:
     url = instance + '/services/oauth2/authorize?client_id=PlatformCLI&state=test-state'
     browser = '/bin/false' if os.environ.get('TEST_BROWSER_FAIL') else os.environ.get('BROWSER', '/bin/false')
     opened = subprocess.Popen([browser, url], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                              stderr=subprocess.DEVNULL, start_new_session=True).wait()
+                              stderr=subprocess.DEVNULL, start_new_session=True).wait(timeout=10)
     if opened:
         print('Error (BrowserOpenError): Unable to open the browser.', file=sys.stderr)
         sys.exit(1)
