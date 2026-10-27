@@ -1,5 +1,4 @@
 """Run real Salesforce Ansible tasks against a local archive/manifest boundary."""
-import functools
 import hashlib
 import http.server
 import io
@@ -9,11 +8,10 @@ from pathlib import Path
 import shutil
 import subprocess
 import tarfile
-import tempfile
-import threading
 import unittest
 
 from test_enroll import ROOT
+from provisioning_fixture import prepare_playbook, provision, serve_vendor, temporary_guest
 
 
 class QuietHandler(http.server.SimpleHTTPRequestHandler):
@@ -31,10 +29,7 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
 @unittest.skipUnless(shutil.which('ansible-playbook'), 'Ansible is required')
 class SalesforceProvisioningTest(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temporary.cleanup)
-        self.directory = Path(self.temporary.name)
-        self.home = self.directory / 'guest'
+        temporary_guest(self)
         self.state = {'.sf/config.json': '{"target-dev-hub":"devhub"}',
                       '.sfdx/devhub.json': 'dummy-enrollment',
                       '.sfdx/key.json': 'dummy-file-keychain',
@@ -48,17 +43,9 @@ class SalesforceProvisioningTest(unittest.TestCase):
         shutil.copy2(ROOT / 'dotfiles/home/.local/bin/sf', launcher)
         self.vendor = self.directory / 'vendor'
         self.vendor.mkdir()
-        self.server = http.server.ThreadingHTTPServer(
-            ('127.0.0.1', 0), functools.partial(QuietHandler, directory=str(self.vendor)))
-        threading.Thread(target=self.server.serve_forever, daemon=True).start()
-        self.addCleanup(self.server.server_close)
-        self.addCleanup(self.server.shutdown)
+        serve_vendor(self, QuietHandler)
         self.publish('1.2.3')
-        self.playbook = self.directory / 'playbook.yml'
-        self.playbook.write_text(json.dumps([{
-            'name': 'Exercise Salesforce Provisioning', 'hosts': 'all', 'gather_facts': False,
-            'vars_files': [str(ROOT / 'provisioning/group_vars/all.yml')],
-            'tasks': [{'ansible.builtin.import_tasks': str(ROOT / 'provisioning/tasks/salesforce.yml')}]}]))
+        prepare_playbook(self, 'salesforce', [])
         self.variables = {
             'ansible_facts': {'system': 'Linux', 'architecture': 'aarch64',
                               'user_dir': str(self.home), 'env': {'PATH': '/usr/bin:/bin'}},
@@ -96,9 +83,7 @@ sys.exit({7 if broken else 0})
         }))
 
     def provision(self, **variables):
-        return subprocess.run(['ansible-playbook', '-i', 'localhost,', '-c', 'local',
-                               str(self.playbook), '-e', json.dumps({**self.variables, **variables})],
-                              capture_output=True, text=True, timeout=90)
+        return provision(self, **variables)
 
     def sf(self):
         return subprocess.run([str(self.home / '.local/bin/sf'), '--version'],

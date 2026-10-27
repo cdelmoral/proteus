@@ -57,37 +57,10 @@
 
 # Provisioning previously installed this package into the pinned mise Node
 # prefix. Include older retained prefixes after a baseline version upgrade.
-- name: Find obsolete Claude Code packages in managed Node installations
-  ansible.builtin.find:
-    paths: "{{ ansible_facts.user_dir }}/.local/share/mise/installs/node"
-    patterns: claude-code
-    file_type: directory
-    recurse: true
-  register: claude_legacy_packages
-
-- name: Uninstall obsolete Provisioning-owned Claude Code npm packages
-  ansible.builtin.command:
-    argv:
-      - "{{ claude_legacy_prefix }}/bin/npm"
-      - uninstall
-      - --global
-      - --prefix
-      - "{{ claude_legacy_prefix }}"
-      - --ignore-scripts
-      - --no-audit
-      - --no-fund
-      - '@anthropic-ai/claude-code'
+- name: Remove obsolete Provisioning-owned Claude Code npm packages
+  ansible.builtin.import_tasks: migrate_npm_tool.yml
   vars:
-    claude_legacy_prefix: "{{ item.path | regex_replace('/lib/node_modules/@anthropic-ai/claude-code$', '') }}"
-  environment: >-
-    {{ managed_user_environment | combine({
-      "PATH": claude_legacy_prefix ~ "/bin:" ~ ansible_facts.env.PATH
-    }) }}
-  loop: "{{ claude_legacy_packages.files }}"
-  when: >-
-    item.path is match('^' ~ (ansible_facts.user_dir | regex_escape) ~
-    '/.local/share/mise/installs/node/[^/]+/lib/node_modules/@anthropic-ai/claude-code$')
-  changed_when: true
+    legacy_npm_package: '@anthropic-ai/claude-code'
 
 - name: Expose the standalone Claude Code command for interactive use
   ansible.builtin.file:
@@ -121,7 +94,9 @@
     owner: root
     group: root
     mode: "0644"
-    content: "{{ {'attribution': {'commit': '', 'pr': ''}, 'env': {'DISABLE_AUTOUPDATER': '1'}} | to_nice_json }}\n"
+    content: >-
+      {{ {'attribution': {'commit': '', 'pr': ''}, 'env': {'DISABLE_AUTOUPDATER': '1',
+      'CLAUDE_ENV_FILE': ansible_facts.user_dir ~ '/.local/lib/proteus/project-env.sh'}} | to_nice_json }}
   become: true
 
 - name: Read the registered Claude Code marketplaces

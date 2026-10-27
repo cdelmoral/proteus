@@ -5,6 +5,23 @@ repository_root="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 readonly repository_root
 readonly vm_definition="${repository_root}/vm/proteus.yaml"
 readonly provision_command="${repository_root}/provision"
+# Real T3 acceptance is an explicit continuation on an existing authorized guest.
+# Never enroll the disposable VM or restart any service to manufacture evidence.
+if [[ "${1:-}" == --t3-node-prepare || "${1:-}" == --t3-node-verify ]]; then
+  action="$1"
+  authorized_instance="${2:?An existing authorized Lima instance is required}"
+  if [[ "$action" == --t3-node-prepare ]]; then
+    workspace="$(limactl shell --tty=false --start=false "$authorized_instance" mktemp -d /tmp/proteus-t3-node.XXXXXXXX)"
+    limactl shell --tty=false --start=false "$authorized_instance" tee "$workspace/probe.py" \
+      < "$repository_root/tests/t3_node_probe.py" > /dev/null
+    limactl shell --tty=false --start=false "$authorized_instance" python3 "$workspace/probe.py" prepare
+  else
+    workspace="${3:?The prepared workspace is required}"
+    limactl shell --tty=false --start=false "$authorized_instance" python3 "$workspace/probe.py" verify
+  fi
+  exit
+fi
+
 generated_suffix="$(date -u +%Y%m%d%H%M%S)-$$-${RANDOM}"
 readonly generated_suffix
 readonly instance="${PROTEUS_ACCEPTANCE_INSTANCE:-proteus-acceptance-${generated_suffix}}"
@@ -92,4 +109,4 @@ limactl shell --tty=false --start=false "$instance" python3 - verify "$node_work
   < "$repository_root/tests/lima_node_selection.py"
 limactl shell --tty=false --start=false "$instance" bash -s -- check < "$repository_root/tests/lima_opencode.sh"
 
-printf "Disposable Lima acceptance passed for '%s'.\n" "$instance"
+printf "Disposable Lima component acceptance passed (real T3 provider acceptance is separate) for '%s'.\n" "$instance"

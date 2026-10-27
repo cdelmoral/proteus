@@ -112,3 +112,6 @@ aws_helper_install_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/aws-h
 # Explicit Provisioning owns OpenCode updates; use the official glibc ARM64 archive.
 opencode_release_url: https://api.github.com/repos/anomalyco/opencode/releases/latest
 opencode_install_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/opencode"
+
+# Source of the Managed Dotfiles collection, including system policy templates.
+proteus_dotfiles_source: "{{ playbook_dir }}/../dotfiles"

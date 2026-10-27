@@ -72,40 +72,10 @@
     content: "{{ t3_version }}\n"
     mode: "0644"
 
-- name: Find obsolete T3 packages in managed Node installations
-  ansible.builtin.find:
-    paths: "{{ ansible_facts.user_dir }}/.local/share/mise/installs/node"
-    patterns: t3
-    file_type: directory
-    recurse: true
-  register: t3_legacy_packages
-
-- name: Uninstall obsolete Provisioning-owned T3 npm packages
-  ansible.builtin.command:
-    argv:
-      - timeout
-      - --kill-after=5
-      - '60'
-      - "{{ t3_legacy_prefix }}/bin/npm"
-      - uninstall
-      - --global
-      - --prefix
-      - "{{ t3_legacy_prefix }}"
-      - --ignore-scripts
-      - --no-audit
-      - --no-fund
-      - t3
+- name: Remove obsolete Provisioning-owned T3 npm packages
+  ansible.builtin.import_tasks: migrate_npm_tool.yml
   vars:
-    t3_legacy_prefix: "{{ item.path | regex_replace('/lib/node_modules/t3$', '') }}"
-  environment: >-
-    {{ managed_user_environment | combine({
-      "PATH": t3_legacy_prefix ~ "/bin:" ~ ansible_facts.env.PATH
-    }) }}
-  loop: "{{ t3_legacy_packages.files }}"
-  when: >-
-    item.path is match('^' ~ (ansible_facts.user_dir | regex_escape) ~
-    '/.local/share/mise/installs/node/[^/]+/lib/node_modules/t3$')
-  changed_when: true
+    legacy_npm_package: t3
 
 - name: Expose the standalone T3 CLI for interactive use
   ansible.builtin.file:

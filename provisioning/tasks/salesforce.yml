@@ -73,37 +73,10 @@
 
 # Only direct global packages in retained mise Node prefixes were installed by
 # Provisioning. Do not traverse into project-local or custom npm prefixes.
-- name: Find obsolete Salesforce CLI packages in managed Node installations
-  ansible.builtin.find:
-    paths: "{{ ansible_facts.user_dir }}/.local/share/mise/installs/node"
-    patterns: cli
-    file_type: directory
-    recurse: true
-  register: salesforce_legacy_packages
-
-- name: Uninstall obsolete Provisioning-owned Salesforce CLI npm packages
-  ansible.builtin.command:
-    argv:
-      - "{{ salesforce_legacy_prefix }}/bin/npm"
-      - uninstall
-      - --global
-      - --prefix
-      - "{{ salesforce_legacy_prefix }}"
-      - --ignore-scripts
-      - --no-audit
-      - --no-fund
-      - '@salesforce/cli'
+- name: Remove obsolete Provisioning-owned Salesforce CLI npm packages
+  ansible.builtin.import_tasks: migrate_npm_tool.yml
   vars:
-    salesforce_legacy_prefix: "{{ item.path | regex_replace('/lib/node_modules/@salesforce/cli$', '') }}"
-  environment: >-
-    {{ managed_user_environment | combine({
-      "PATH": salesforce_legacy_prefix ~ "/bin:" ~ ansible_facts.env.PATH
-    }) }}
-  loop: "{{ salesforce_legacy_packages.files }}"
-  when: >-
-    item.path is match('^' ~ (ansible_facts.user_dir | regex_escape) ~
-    '/.local/share/mise/installs/node/[^/]+/lib/node_modules/@salesforce/cli$')
-  changed_when: true
+    legacy_npm_package: '@salesforce/cli'
 
 - name: Inspect obsolete Salesforce launcher links
   ansible.builtin.stat:

@@ -52,6 +52,8 @@ class NodeSelectionTest(unittest.TestCase):
         (local_bin / 'pnpm').chmod(0o755)
         shutil.copy(ROOT / 'dotfiles/home/.local/bin/proteus-project-exec', local_bin)
         self.launcher = str(local_bin / 'proteus-project-exec')
+        self.project_env = self.home / 'project-env.sh'
+        shutil.copy(ROOT / 'dotfiles/home/.local/lib/proteus/project-env.sh', self.project_env)
 
     def run_mise(self, *args, cwd=None):
         return subprocess.run([MISE, *args], cwd=cwd or self.home,
@@ -159,3 +161,54 @@ class NodeSelectionTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(self.background(self.home, 'sh', '-c', 'exit 7').returncode, 7)
         self.assertEqual(self.background(self.home).returncode, 2)
+
+    def test_provider_command_environment_overrides_private_node_without_helper(self):
+        project = self.home / 'agent-project'
+        project.mkdir()
+        (project / '.nvmrc').write_text('20.19.0')
+        parent = self.home / '.local/share/mise/installs/node/22.14.0/bin'
+        self.env['PATH'] = str(parent) + ':/usr/bin:/bin'
+        # Bash's supported noninteractive boundary (Codex BASH_ENV), followed
+        # by direct commands. No invocation of proteus-project-exec here.
+        self.env['BASH_ENV'] = str(self.project_env)
+        result = subprocess.run(['bash', '-c', 'node -v; cd "$1"; node -v',
+                                 'bash', str(project)], cwd=self.home, env=self.env,
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ['v22.14.0', 'v20.19.0'])
+        # Claude sources CLAUDE_ENV_FILE after restoring its shell snapshot.
+        self.env.pop('BASH_ENV')
+        result = subprocess.run(['bash', '-c', '. "$1"; node -v', 'bash', str(self.project_env)],
+                                cwd=project, env=self.env, capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), 'v20.19.0')
+        (project / '.nvmrc').write_text('18.20.8')
+        self.env['BASH_ENV'] = str(self.project_env)
+        result = subprocess.run(['bash', '-c', 'pnpm --version'], cwd=project,
+                                env=self.env, capture_output=True, text=True, timeout=20)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('mise install', result.stderr)
+
+    def test_managed_opencode_launch_configures_bash_boundary_automatically(self):
+        project = self.home / 'opencode-project'
+        project.mkdir()
+        (project / '.nvmrc').write_text('20.19.0')
+        library = self.home / '.local/lib/proteus'
+        library.mkdir(parents=True)
+        for filename in ['project-env.sh', 'opencode.json']:
+            shutil.copy(ROOT / 'dotfiles/home/.local/lib/proteus' / filename, library)
+        binary = self.home / '.local/share/proteus/opencode/opencode'
+        binary.parent.mkdir(parents=True)
+        # Simulate only the native provider. Run its configured shell normally,
+        # without the legacy plugin, to cover the V2 Bash startup fallback.
+        binary.write_text('''#!/usr/bin/python3
+import json, os, subprocess, sys
+shell = json.load(open(os.environ['OPENCODE_CONFIG']))['shell']
+sys.exit(subprocess.call([shell, '-c', 'node -v']))
+''')
+        binary.chmod(0o755)
+        self.env['PATH'] = str(self.home / '.local/share/mise/installs/node/22.14.0/bin') + ':/usr/bin:/bin'
+        result = subprocess.run([str(ROOT / 'dotfiles/home/.local/bin/opencode')],
+                                cwd=project, env=self.env, capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), 'v20.19.0')

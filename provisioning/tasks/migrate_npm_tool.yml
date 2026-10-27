@@ -1,0 +1,38 @@
+---
+# Only direct global packages in Proteus's retained mise Node prefixes are owned.
+# A similarly named directory nested in a workspace must never be uninstalled.
+- name: Find obsolete packages in managed Node installations
+  ansible.builtin.find:
+    paths: "{{ ansible_facts.user_dir }}/.local/share/mise/installs/node"
+    patterns: "{{ legacy_npm_package | basename }}"
+    file_type: directory
+    recurse: true
+  register: legacy_npm_packages
+
+- name: Uninstall obsolete Provisioning-owned npm packages
+  ansible.builtin.command:
+    argv:
+      - timeout
+      - --kill-after=5
+      - '60'
+      - "{{ legacy_npm_prefix }}/bin/npm"
+      - uninstall
+      - --global
+      - --prefix
+      - "{{ legacy_npm_prefix }}"
+      - --ignore-scripts
+      - --no-audit
+      - --no-fund
+      - "{{ legacy_npm_package }}"
+  vars:
+    legacy_npm_suffix: "/lib/node_modules/{{ legacy_npm_package }}"
+    legacy_npm_prefix: "{{ item.path | regex_replace((legacy_npm_suffix | regex_escape) ~ '$', '') }}"
+  environment: >-
+    {{ managed_user_environment | combine({
+      "PATH": legacy_npm_prefix ~ "/bin:" ~ ansible_facts.env.PATH
+    }) }}
+  loop: "{{ legacy_npm_packages.files }}"
+  when: >-
+    item.path is match('^' ~ (ansible_facts.user_dir | regex_escape) ~
+    '/.local/share/mise/installs/node/[^/]+' ~ (legacy_npm_suffix | regex_escape) ~ '$')
+  changed_when: true

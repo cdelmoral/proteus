@@ -1,34 +1,22 @@
 """Run T3's actual Ansible tasks against an isolated vendor boundary."""
-import functools
 import hashlib
-import http.server
 import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
-import tempfile
-import threading
 import tarfile
 import unittest
 
 from test_enroll import ROOT
-
-
-class QuietHandler(http.server.SimpleHTTPRequestHandler):
-    def log_message(self, *args):
-        pass
+from provisioning_fixture import (QuietHandler, prepare_playbook, provision,
+                                  serve_vendor, temporary_guest)
 
 
 @unittest.skipUnless(shutil.which('ansible-playbook'), 'Ansible is required')
 class T3ProvisioningTest(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temporary.cleanup)
-        self.directory = Path(self.temporary.name)
-        self.home = self.directory / 'guest'
-        self.system = self.directory / 'system'
-        (self.system / 'bin').mkdir(parents=True)
+        temporary_guest(self)
         self.state = {
             '.t3/userdata/secrets/credential': 'preserve-credential',
             '.t3/userdata/server-runtime.json': '{"pid": 1234, "serviceManaged": true}',
@@ -43,21 +31,9 @@ class T3ProvisioningTest(unittest.TestCase):
             destination.write_text(content)
         self.vendor = self.directory / 'vendor'
         self.publish('1.2.3')
-        self.server = http.server.ThreadingHTTPServer(
-            ('127.0.0.1', 0), functools.partial(QuietHandler, directory=str(self.vendor)))
-        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
-        self.thread.start()
-        self.addCleanup(self.server.server_close)
-        self.addCleanup(self.server.shutdown)
-        self.tasks = self.directory / 't3.yml'
-        self.tasks.write_text((ROOT / 'provisioning/tasks/t3.yml').read_text()
-                              .replace('/usr/local', str(self.system))
-                              .replace('become: true', 'become: false'))
-        self.playbook = self.directory / 'playbook.yml'
-        self.playbook.write_text(json.dumps([{
-            'name': 'Exercise T3 Provisioning', 'hosts': 'all', 'gather_facts': False,
-            'vars_files': [str(ROOT / 'provisioning/group_vars/all.yml')],
-            'tasks': [{'ansible.builtin.import_tasks': str(self.tasks)}]}]))
+        serve_vendor(self, QuietHandler)
+        prepare_playbook(self, 't3', [('/usr/local', str(self.system)),
+                                      ('become: true', 'become: false')])
         self.variables = {
             'ansible_facts': {'system': 'Linux', 'architecture': 'aarch64',
                               'user_dir': str(self.home), 'env': {'PATH': '/usr/bin:/bin'}},
@@ -96,9 +72,7 @@ else:
         (release / 'SHA256SUMS').write_text(f'{digest}  {archive.name}\n')
 
     def provision(self, **variables):
-        return subprocess.run(['ansible-playbook', '-i', 'localhost,', '-c', 'local',
-                               str(self.playbook), '-e', json.dumps({**self.variables, **variables})],
-                              capture_output=True, text=True, timeout=90)
+        return provision(self, **variables)
 
     def assert_state(self):
         for path, content in self.state.items():

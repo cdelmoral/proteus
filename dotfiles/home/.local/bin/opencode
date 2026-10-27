@@ -1,4 +1,10 @@
 #!/bin/sh
-# Provisioning owns updates. Leave PATH intact for project subprocesses.
+# Provisioning owns updates. Leave the provider runtime PATH intact.
+# The configured Bash command shell sources this file at each launch, including
+# OpenCode V2 where the shell.env plugin hook is not implemented.
+# The extra config merges with normal user/project config; an explicit custom
+# config remains the caller's choice. T3's inline permission config is retained.
+export OPENCODE_CONFIG="${OPENCODE_CONFIG:-$HOME/.local/lib/proteus/opencode.json}"
+export BASH_ENV="$HOME/.local/lib/proteus/project-env.sh"
 export OPENCODE_DISABLE_AUTOUPDATE=true
 exec "$HOME/.local/share/proteus/opencode/opencode" "$@"

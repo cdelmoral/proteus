@@ -54,44 +54,114 @@ pnpm remains installed once and its Node interpreter uses project selection.
 
 An enrolled T3 service keeps its running executable, runtime, environment and
 credentials. Provisioning does not restart, upgrade, replace, or reenroll it.
-An existing service may have captured a PATH with a private Node directory before
-`/usr/local/bin`, or omit `/usr/local/bin` entirely. Updating files cannot change
-that inherited PATH. From an agent in such a service, run project commands with
-the absolute managed entrypoint, starting in the repository directory:
+Project command environments are configured at the provider shell boundary:
+
+- Claude's managed `CLAUDE_ENV_FILE` sources the Managed Dotfiles
+  `project-env.sh` before each Bash command, after shell state restoration.
+- OpenCode's managed launcher supplies `BASH_ENV` and an extra configuration
+  selecting Bash. This configuration merges with normal user configuration;
+  it does not replace credentials or user settings. An explicit caller
+  `OPENCODE_CONFIG` is retained. A global `shell.env` plugin also prepends the
+  managed entrypoints for OpenCode's legacy shell implementation. OpenCode V2
+  currently lacks that plugin hook, so its configured Bash startup is required.
+- Codex's system configuration supplies `shell_environment_policy.set` for
+  command PATH and `BASH_ENV`, including when T3 uses a shadow `CODEX_HOME`.
+  This PATH includes managed entrypoints and standard system directories, not
+  the provider's private runtime directory. Add custom command search locations
+  through Codex configuration if needed. Existing unrelated system settings are
+  retained; a conflicting existing `[shell_environment_policy.set]` table fails
+  validation without overwriting it and needs an explicit configuration merge.
+- Login shells source the same managed environment from `/etc/profile.d` so
+  shell startup and newly captured snapshots use shims rather than concrete Node
+  prefixes. The provider's interpreter is never selected through this script.
+
+These mechanisms select mise shims, not baseline Node. Direct `node`, `npm`,
+`npx`, `pnpm run build`, and `pnpm test` therefore resolve from their command's
+working directory, including after `cd`. Ordinary execution still never installs
+Node. No per-command helper prefix should be necessary in a provider session
+that has loaded this configuration.
+
+Provisioning cannot rewrite the in-memory environment, cached shell snapshot or
+loaded plugins of an already running provider. T3 provider-instance environment
+settings merge into new provider launches; they are not a command-shell hook or
+a live mutation API. Current T3 supports custom provider binaries and environment
+variables, but has no universal agent-command-shell setting. Merely changing
+service PATH on disk cannot repair already captured state. This is a residual
+limit for preexisting sessions, not a reason to restart the enrolled service.
+New provider sessions can load the boundary configuration while that service
+continues running on its original runtime. Do not restart, upgrade or reenroll
+T3 to apply this change automatically.
+
+User/project configuration or T3 launch overrides can supersede Codex defaults
+or OpenCode's shell choice. A direct vendor-binary override can bypass the
+managed OpenCode launcher. Explicit absolute Node paths remain explicit runtime
+choices. A preexisting Codex snapshot or provider environment that restores a
+private Node PATH must be checked through actual T3 execution. Until verified,
+use the absolute recovery entrypoint from the repository directory:
 
 ```bash
-/usr/local/bin/proteus-project-exec node --version
 /usr/local/bin/proteus-project-exec pnpm run build
 /usr/local/bin/proteus-project-exec pnpm test
-/usr/local/bin/proteus-project-exec sh -c 'node --version; cd ../other-project; node --version'
+/usr/local/bin/proteus-project-exec "$HOME/.local/bin/mise" install node
 ```
 
-`proteus-project-exec` prepends the managed project entrypoints and mise shims to
-the child's PATH and preserves arguments and exit status. It does not select a
-baseline Node for the child or change the parent tool's interpreter. Use it at
-the project-command boundary when a tool supplies its own runtime PATH. Absolute
-runtime paths supplied by a project or tool remain explicit runtime choices.
+The helper is a recovery path; its success alone is not proof of automatic T3
+selection. Do not wrap the service or every child in a baseline-Node PATH.
 
-To recover an absent runtime through the same background environment:
+## Real T3 acceptance
+
+`make lima-acceptance` checks the disposable guest's real artifacts, interactive
+shells and transient systemd commands. Its synthetic parent/helper tests are
+component coverage; they do **not** prove the actual T3 agent boundary.
+
+Real T3 coverage requires an existing, explicitly authorized Lima guest with
+Provisioning applied and Claude, OpenCode and Codex already available through
+T3. From macOS, prepare temporary projects without enrollment or service changes:
 
 ```bash
-/usr/local/bin/proteus-project-exec "$HOME/.local/bin/mise" install node
-/usr/local/bin/proteus-project-exec pnpm test
+./tests/lima_acceptance.sh --t3-node-prepare proteus
 ```
 
-Review and trust `mise.toml` first if required. Ordinary execution does not
-install a version or fall back. The tool preparing the project can remain on its
-own runtime while installation runs. No Credential Enrollment is needed.
+This explicitly installs Node 22.14.0 and 20.19.0 without changing the global
+default. It prints a workspace and one probe command for each provider. Ask an
+agent in each corresponding T3 provider to execute its printed command through
+its normal shell tool, with no helper, PATH override or manual sourcing. Run
+providers sequentially; each probe checks concurrent Node execution internally.
+Keep the actual T3 command activity as provenance alongside the generated JSON.
+The probe records inherited PATH and process ancestry (names and executable
+paths, not command arguments), and checks all three declarations, default
+selection, directory switching, pnpm builds/tests, failure propagation, missing
+runtime failure and unchanged global selection. It fails if the managed helper
+is missing or inherited private Node wins. Do not simulate these result files.
 
-For direct unprefixed commands in an older T3 service, inspect its effective PATH
-and command resolution from an agent (`printf '%s\n' "$PATH"; command -v node`).
-If its private runtime wins, keep using the explicit entrypoint. A permanent
-service PATH migration requires a separately planned, explicit T3 service
-operation during a suitable interruption window: preserve its pinned executable
-and credentials, arrange for `/usr/local/bin` before concrete Node prefixes in
-the child environment, and verify project commands after restart. CLI updates
-and repeated enrollment do not authorize that migration. Do not wrap the T3
-service in a blanket baseline-Node PATH; that would also override child projects.
+Then validate all three results using the workspace printed by preparation:
+
+```bash
+./tests/lima_acceptance.sh --t3-node-verify proteus /tmp/proteus-t3-node.EXAMPLE
+```
+
+Missing evidence fails validation. A JSON result alone does not authenticate its
+execution source: inspect the saved T3 activity. Retain results before explicitly
+removing the temporary workspace. No credentials are enrolled and no service
+is installed, restarted or upgraded by either mode. This acceptance has **not**
+been run for these review fixes: the implementation host is Linux ARM64, without
+the authorized macOS/Lima/Connect environment. Provider-specific behavior and
+preservation of a real enrolled service remain unverified until that run.
+
+Boundary references checked on 2026-10-27:
+[Claude command environment](https://code.claude.com/docs/en/env-vars),
+[Codex shell environment policy](https://developers.openai.com/codex/config-reference/),
+[Codex configuration precedence](https://learn.chatgpt.com/docs/config-file/config-basic),
+[OpenCode shell environment plugins](https://opencode.ai/docs/plugins/), and
+[OpenCode configuration merging](https://opencode.ai/docs/config/).
+T3's [provider setup](https://github.com/pingdotgg/t3code/blob/36d4d711b79c73eb33131944f73ea4a8c6156484/docs/user/install.md#providers),
+[instance environment merge](https://github.com/pingdotgg/t3code/blob/36d4d711b79c73eb33131944f73ea4a8c6156484/packages/provider-core/src/server/instanceEnvironment.ts),
+and [OpenCode process launch](https://github.com/pingdotgg/t3code/blob/36d4d711b79c73eb33131944f73ea4a8c6156484/packages/provider-opencode/src/server/OpenCodeRuntime.ts)
+show the provider launch boundary. OpenCode v1.19.4's
+[legacy shell hook](https://github.com/anomalyco/opencode/blob/v1.19.4/packages/opencode/src/tool/shell.ts)
+and [V2 shell implementation](https://github.com/anomalyco/opencode/blob/v1.19.4/packages/core/src/tool/bash.ts)
+show the version-specific hook limitation. Installed versions can differ; real
+acceptance against the enrolled environment is still required.
 
 Mise references: [Node declarations](https://mise.jdx.dev/lang/node.html),
 [shim selection](https://mise.jdx.dev/dev-tools/shims.html), and
