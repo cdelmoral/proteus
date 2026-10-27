@@ -14,6 +14,8 @@ T3 tests simulate systemd, lingering, and provider-independent Connect setup, in
 
 GitHub credential tests require Git, GitHub CLI, and OpenSSH. They exercise real credential lookup with dummy tokens and real signing with temporary keys, without network access. They cover background Git and `gh` commands, commit signing without a terminal or SSH agent, identity preservation, reprovisioning, credential rotation, invalid or encrypted keys, rejected tokens, missing references, and failed secret reads. Configure tests cover reference examples, preserving both defaults, upgrading token-only configuration, and interrupted input.
 
+The focused Node tests execute pinned mise against temporary homes and isolated fixture executables, without downloading Node or touching the user's mise configuration. Run them with `PROTEUS_TEST_MISE=/absolute/path/to/mise-2026.9.1 python3 -m unittest discover -s tests -p test_node_selection.py`. Without this variable they skip; these fixtures verify mise selection and missing-version behavior, while real Node/pnpm integration belongs to Lima acceptance.
+
 ## Manual acceptance
 
 Run the real macOS-to-Lima acceptance check manually:
@@ -22,11 +24,15 @@ Run the real macOS-to-Lima acceptance check manually:
 make lima-acceptance
 ```
 
-The check validates the production VM Definition, creates and starts a uniquely named `proteus-acceptance-*` VM, and runs production Provisioning twice. Claude assertions are isolated in `tests/claude_guest_acceptance.py`: the fresh run checks actual ARM64 artifact compatibility, interactive and system-PATH command availability, public marketplace/skills installation, managed attribution/update policy, and unauthenticated status with project Node blocked. It then seeds the obsolete vendor npm installation and dummy credential, configuration, and history state. The repeated run must migrate npm and preserve that state. No real Credential Enrollment is performed. This checks Claude behavior rather than exact convergence of all Provisioning tasks; setup or cleanup failures also fail the command.
+The check validates the production VM Definition, creates and starts a uniquely named `proteus-acceptance-*` VM, and runs production Provisioning twice. Claude assertions are isolated in `tests/claude_guest_acceptance.py`: the fresh run checks actual ARM64 artifact compatibility, interactive and system-PATH command availability, public marketplace/skills installation, managed attribution/update policy, and unauthenticated status with project Node blocked. It then seeds the obsolete vendor npm installation and dummy credential, configuration, and history state.
+
+Node assertions in `tests/lima_node_selection.py` use temporary repositories to exercise `.nvmrc`, `.node-version`, and `mise.toml`, interactive directory switching and default selection, explicit installation, missing-version failures without download, and pnpm build/test scripts with observed runtimes and failure propagation. They deliberately change the global default before the second Provisioning run.
+
+The repeated run must migrate Claude's obsolete npm installation and preserve its user state, restore the pinned Node default, and retain usable additional project versions. No real Credential Enrollment is performed. Setup, assertions, Provisioning, and cleanup failures fail the command. This checks observable behavior rather than exact convergence of all Provisioning tasks.
 
 Focused Claude tests execute the actual Ansible tasks with a local HTTP vendor fixture and real npm migration across retained Node prefixes. They exercise upgrades, checksum/selector failures, user-state preservation, and child environment preservation. Enrollment subprocess tests confirm that login/status no longer require mise. These fixtures do not prove Linux ARM64 vendor compatibility or real authentication.
 
-Claude guest acceptance evidence: **unrun** on the Linux implementation host. Run `make lima-acceptance` on macOS and record the date, guest architecture, Claude version, and fresh/repeated outcomes before claiming guest acceptance. Real `./enroll claude` and subsequent authenticated status also remain manual, unrun checks requiring the owner's authorization; they are not part of the automated acceptance flow. Project Node resolution and an authenticated agent launching project builds belong to the other spec #50 tickets.
+Claude guest acceptance evidence: **unrun** on the Linux implementation host. Run `make lima-acceptance` on macOS and record the date, guest architecture, Claude version, and fresh/repeated outcomes before claiming guest acceptance. Real `./enroll claude` and subsequent authenticated status also remain manual, unrun checks requiring the owner's authorization; they are not part of the automated acceptance flow. Node guest acceptance is also **unrun** on this host. Noninteractive project Node resolution and an authenticated agent launching project builds belong to the other spec #50 tickets.
 
 The check refuses to adopt an existing instance and deletes the VM it created after success or failure. It disables development-port forwarding for that VM, so the normal `proteus` instance may remain running.
 
@@ -93,4 +99,4 @@ Use the [setup, replacement and rebuild guide](./aws-setup.md) and
 [AWS Credential Enrollment guide](./aws-enrollment.md) as the operating steps.
 Record actual outcomes and dates here when acceptance is performed; do not mark
 these rows passed from automated fixtures. `make lima-acceptance` checks baseline
-Provisioning only and does not run this AWS matrix.
+Provisioning and project Node selection; it does not run this AWS matrix.
