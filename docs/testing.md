@@ -8,9 +8,9 @@ Run `make static test` to validate Provisioning and the VM Definition and exerci
 
 Teamwork Graph tests run the real enrollment helper and simulate TWG and lingering commands. They cover guest-local authorization, preserving healthy credentials, minimal native verification, upkeep failures and retries, custom instances, and terminal/VM prerequisites. Unexpected product probes or service-health commands fail the simulated CLI.
 
-Salesforce tests run the real launcher, enrollment helper, and URL-capture script in the guest home and simulate only the standalone Salesforce CLI, which opens its authorization URL through `BROWSER` as Salesforce CLI does. They cover login, browser-launch, and verification failures, repeat enrollment, and VM and terminal checks. Configuration tests drive `./configure` to save, keep, and reject Salesforce login URLs while preserving the GitHub references, and confirm the saved URL or the standard default reaches Salesforce CLI. Salesforce CLI tests run the managed `sf` launcher from the system PATH without shell startup and simulate only the archive runtime and CLI, verifying keychain, telemetry and updater settings, argument forwarding, failure propagation, and unchanged child PATH across installed and missing project runtimes. Salesforce Provisioning tests run real Ansible tasks against a local manifest and archive, including digest/runtime failures, repeat runs, upgrades, obsolete npm cleanup, and preservation of dummy user state.
+Salesforce tests run the real launcher, enrollment helper, and URL-capture script in the guest home and simulate only the standalone Salesforce CLI, which opens its authorization URL through `BROWSER` as Salesforce CLI does. They cover login, browser-launch, and verification failures, repeat enrollment, and VM and terminal checks. Configuration tests drive `./configure` to save, keep, and reject Salesforce login URLs while preserving the GitHub references, and confirm the saved URL or the standard default reaches Salesforce CLI. Salesforce CLI tests run the managed `sf` launcher from the system PATH without shell startup and simulate only the archive runtime and CLI, verifying keychain, telemetry and updater settings, argument forwarding, failure propagation, and unchanged child PATH across installed and missing project runtimes. Salesforce Provisioning tests run real Ansible tasks against a local manifest and archive, including digest/runtime failures, repeat runs, upgrades, and preservation of dummy user state.
 
-T3 tests simulate systemd, lingering, and provider-independent Connect setup, including partial failures, retries, and existing-server protection. They verify completion from saved Connect configuration and systemd persistence, including links saved after startup and healthy services without private runtime metadata. Focused Provisioning tests execute the real Ansible tasks with local release archives/checksums and real npm migration across retained Node prefixes. They cover upgrades, invalid artifacts/selectors, preserved service files and credentials, direct enrollment without mise, and inherited project child PATH.
+T3 tests simulate systemd, lingering, and provider-independent Connect setup, including partial failures, retries, and existing-server protection. They verify completion from saved Connect configuration and systemd persistence, including links saved after startup and healthy services without private runtime metadata. Focused Provisioning tests execute the real Ansible tasks with local release archives/checksums. They cover upgrades, invalid artifacts/selectors, preserved service files and credentials, direct enrollment without mise, and inherited project child PATH.
 
 GitHub credential tests require Git, GitHub CLI, and OpenSSH. They exercise real credential lookup with dummy tokens and real signing with temporary keys, without network access. They cover background Git and `gh` commands, commit signing without a terminal or SSH agent, identity preservation, reprovisioning, credential rotation, invalid or encrypted keys, rejected tokens, missing references, and failed secret reads. Configure tests cover reference examples, preserving both defaults, upgrading token-only configuration, and interrupted input.
 
@@ -18,7 +18,7 @@ The focused Node tests execute pinned mise against temporary homes and isolated 
 
 OpenCode tests execute the real Ansible installation tasks against a local HTTP
 release feed and fixture archives. They verify digest and platform rejection,
-failed candidates preserving the old installation, migration, repeat runs and
+failed candidates preserving the old installation, repeat runs and
 updates, unrelated command preservation, and untouched user state. A real launcher
 test verifies argument forwarding, failure propagation, the auto-update flag, and
 child command resolution through an unchanged project PATH. The vendor executable
@@ -30,6 +30,20 @@ still part of spec #50's Node-selection acceptance.
 OpenCode #54 implementation validation ran on Linux. Real macOS/Lima acceptance
 remains **unrun**; do not interpret local fixture results as guest evidence.
 
+Release guard tests drive the real `./provision` entrypoint and the production
+Ansible guard with a local transport and a simulated Python/bootstrap boundary.
+They cover fresh/repeated releases, numeric compatible upgrades, incompatible
+majors, old unversioned guests, all downgrades, corrupt versions, interrupted
+retries and failed upgrades retaining the accepted marker. Rejections leave seeded
+guest data unchanged and never reach the mutation boundary. No real VM is used.
+
+Local release-policy validation (2026-10-27, Linux ARM64): `make static` passed
+and `make test` passed all 156 tests with zero skips. Runs unset `T3CODE_HOME` and
+use a controlled tool/system PATH; the full suite includes Node 24.20.0 and
+`PROTEUS_TEST_MISE` pointing to pinned mise 2026.9.1. Static and suite timeouts
+were 180 and 600 seconds. These checks use isolated fixtures; no real guest,
+Credential Enrollment, or service restart was performed.
+
 ## Manual acceptance
 
 Run the real macOS-to-Lima acceptance check manually:
@@ -38,7 +52,7 @@ Run the real macOS-to-Lima acceptance check manually:
 make lima-acceptance
 ```
 
-The check validates the production VM Definition, creates and starts a uniquely named `proteus-acceptance-*` VM, and runs production Provisioning twice. Claude assertions are isolated in `tests/claude_guest_acceptance.py`: the fresh run checks actual ARM64 artifact compatibility, interactive and system-PATH command availability, public marketplace/skills installation, managed attribution/update policy, and unauthenticated status with project Node blocked. It then seeds the obsolete vendor npm installation and dummy credential, configuration, and history state.
+The check validates the production VM Definition, creates and starts a uniquely named `proteus-acceptance-*` VM, and runs production Provisioning twice, checking the accepted release marker against `VERSION` after each pass. Claude assertions are isolated in `tests/claude_guest_acceptance.py`: the fresh run checks actual ARM64 artifact compatibility, interactive and system-PATH command availability, public marketplace/skills installation, managed attribution/update policy, and unauthenticated status with project Node blocked. It then seeds dummy credential, configuration, and history state.
 
 Node assertions in `tests/lima_node_selection.py` use temporary repositories to exercise `.nvmrc`, `.node-version`, and `mise.toml`, interactive directory switching and default selection, explicit installation, missing-version failures without download, and pnpm build/test scripts with observed runtimes and failure propagation. They deliberately change the global default before the second Provisioning run.
 
@@ -55,9 +69,9 @@ The disposable guest must have a functioning systemd user manager; failure to
 launch a transient service fails acceptance rather than substituting a fixture.
 This requires no T3 enrollment and does not touch an existing T3 service.
 
-Claude, Salesforce, OpenCode, and T3 migration fixtures are seeded before Node assertions change the global default. The shared repeated run must migrate their obsolete npm installations and preserve each tool's user state, restore the pinned Node default, and retain usable additional project versions. No real Credential Enrollment is performed. Setup, assertions, Provisioning, and cleanup failures fail the command. This checks observable behavior rather than exact convergence of all Provisioning tasks.
+Claude, Salesforce, OpenCode, and T3 dummy state is seeded before Node assertions change the global default. The compatible repeated run must preserve each tool's user state, restore the pinned Node default, and retain usable additional project versions. No real Credential Enrollment is performed. Setup, assertions, Provisioning, and cleanup failures fail the command. This checks observable behavior rather than exact convergence of all Provisioning tasks.
 
-Focused Claude tests execute the actual Ansible tasks with a local HTTP vendor fixture and real npm migration across retained Node prefixes. They exercise upgrades, checksum/selector failures, user-state preservation, and child environment preservation. Enrollment subprocess tests confirm that login/status no longer require mise. These fixtures do not prove Linux ARM64 vendor compatibility or real authentication.
+Focused Claude tests execute the actual Ansible tasks with a local HTTP vendor fixture. They exercise upgrades, checksum/selector failures, user-state preservation, and child environment preservation. Enrollment subprocess tests confirm that login/status no longer require mise. These fixtures do not prove Linux ARM64 vendor compatibility or real authentication.
 
 Claude guest acceptance evidence: **unrun** on the Linux implementation host. Run `make lima-acceptance` on macOS and record the date, guest architecture, Claude version, and fresh/repeated outcomes before claiming guest acceptance. Real `./enroll claude` and subsequent authenticated status also remain manual, unrun checks requiring the owner's authorization; they are not part of the automated acceptance flow. Node guest acceptance is also **unrun** on this host.
 
@@ -73,37 +87,20 @@ and unchanged service PID/runtime. Transient systemd services prove guest
 background behavior when run; they do not prove T3's provider subprocess
 environment. Local mise tests use fixture Node executables and prove neither.
 
-#52 local validation (2026-10-27, Linux ARM64): static checks passed; the bounded
-suite completed 132 tests with one npm-prerequisite skip, and that migration test
-passed separately with the existing npm runtime on PATH. All runs unset
-`T3CODE_HOME`. Six Node tests passed using pinned mise and isolated fixture
-executables. These results do not establish Lima or authenticated T3 acceptance.
-
-OpenCode migration is seeded before Node assertions change the global default.
 After the shared second Provisioning run, `tests/lima_opencode.sh` verifies the
-installed vendor binary is ARM64 ELF, the obsolete baseline npm installation is
-gone, user configuration/credentials/skills/state survive byte for byte, and
+installed vendor binary is ARM64 ELF, user configuration/credentials/skills/state
+survive byte for byte, and
 interactive and minimal background environments find the same OpenCode launcher.
 OpenCode must launch from a temporary project requesting an uninstalled Node
 version without installing it; a failing Node executable on the background PATH
 detects accidental runtime coupling.
 
-Integrated #51–#56 merge validation (2026-10-27, Linux ARM64): `make static`
-passed, and the bounded full discovery suite completed 143 tests with zero
-failures and nine prerequisite skips. All nine passed separately: six Node tests
-with `PROTEUS_TEST_MISE` pointing to pinned mise 2026.9.1, plus the Claude,
-Salesforce, and T3 npm migration tests with the existing Node 24.20.0 runtime on
-PATH. Every run unset `T3CODE_HOME`; the full suite used a controlled system/tool
-PATH without project Node. Static/full-suite timeouts were 180/600 seconds;
-focused Node/migration runs were bounded at 120/240 seconds. No real Lima,
-Connect enrollment, or enrolled-service acceptance was performed by this merge.
-
 T3 assertions in `tests/t3_guest_acceptance.py` check the real archive's ARM64
 executable, interactive/system-PATH invocation with blocked project Node, and
 unauthenticated Connect status. Explicit test setup then installs a real local
-systemd service bound to loopback, seeds dummy state and the obsolete npm link,
+systemd service bound to loopback, seeds dummy state,
 and records process identity, runtime hashes, service unit, and configuration.
-Repeat production Provisioning must migrate npm while preserving those records.
+Repeat production Provisioning must preserve those records.
 This service is **not Connect-enrolled**; automated acceptance never authorizes
 Connect or uses real credentials. Subprocesses and service readiness waits are
 bounded.
@@ -144,7 +141,7 @@ Repeat T3 enrollment and confirm it leaves the running service untouched. Verify
 The existing `make lima-acceptance` flow also verifies Salesforce's real Linux
 ARM64 archive, system PATH and user-systemd background availability, launches with
 two installed Node runtimes and an absent project runtime, interactive execution,
-CLI failures, repeat Provisioning and obsolete npm migration. It installs the
+CLI failures and repeat compatible Provisioning. It installs the
 additional Node explicitly and seeds only dummy Salesforce state; it never logs
 in. Fixture tests do not establish real guest or macOS/Lima compatibility. The
 manual Salesforce Credential Enrollment checks below still require a human.

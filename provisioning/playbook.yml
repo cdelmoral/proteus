@@ -4,6 +4,18 @@
   gather_facts: false
 
   pre_tasks:
+    - name: Accept a compatible Proteus release before baseline changes
+      ansible.builtin.raw: |
+        /bin/sh -s -- \
+        {{ lookup('ansible.builtin.file', playbook_dir ~ '/../VERSION', rstrip=false)
+           | regex_replace('\x00', '<NUL>') | quote }} <<'PROTEUS_RELEASE_GUARD'
+        {{ lookup('ansible.builtin.file', playbook_dir ~ '/accept-release.sh', rstrip=false) }}
+        PROTEUS_RELEASE_GUARD
+      register: release_acceptance
+      changed_when: "'__PROTEUS_RELEASE_ACCEPTED__' in release_acceptance.stdout"
+      tags:
+        - always
+
     - name: Ensure Python is available for Ansible modules
       ansible.builtin.raw: |
         if [ -x /usr/bin/python3 ]; then

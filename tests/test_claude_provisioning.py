@@ -2,7 +2,6 @@
 import hashlib
 import json
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import unittest
@@ -46,7 +45,7 @@ class ClaudeProvisioningTest(unittest.TestCase):
         binary = self.vendor / version / 'linux-arm64/claude'
         binary.parent.mkdir(parents=True)
         # The distribution is simulated, not Ansible's download, checksum,
-        # migration, invocation, or link operations. This does not prove ARM64
+        # invocation, or link operations. This does not prove ARM64
         # compatibility; that requires the real Lima acceptance flow.
         binary.write_text(f'''#!{os.sys.executable}
 import json, os, pathlib, subprocess, sys
@@ -121,49 +120,6 @@ else:
             self.assertEqual(child.returncode, 42 if selection == 'missing' else 0)
             if selection != 'missing':
                 self.assertEqual(child.stdout.strip(), selection)
-
-    @unittest.skipUnless(shutil.which('npm') and shutil.which('node'), 'npm is required for migration')
-    def test_migrates_real_npm_packages_from_retained_node_prefixes(self):
-        # A nested project/global prefix is not a Provisioning-owned install.
-        unmanaged = (self.home / '.local/share/mise/installs/node/22.0.0'
-                     / 'workspace/lib/node_modules/@anthropic-ai/claude-code')
-        unmanaged.mkdir(parents=True)
-        (unmanaged / 'package.json').write_text('{"name":"@anthropic-ai/claude-code"}')
-        prefixes = []
-        for version in ('22.0.0', '24.0.0'):
-            prefix = self.home / '.local/share/mise/installs/node' / version
-            package = prefix / 'lib/node_modules/@anthropic-ai/claude-code'
-            package.mkdir(parents=True)
-            (package / 'package.json').write_text(json.dumps({
-                'name': '@anthropic-ai/claude-code', 'version': '0.0.0',
-                'bin': {'claude': 'cli.js'}}))
-            (package / 'cli.js').write_text('obsolete-distribution')
-            (prefix / 'bin').mkdir()
-            (prefix / 'bin/claude').symlink_to(package / 'cli.js')
-            for command in ('npm', 'node'):
-                source = Path(shutil.which(command)).resolve()
-                if command == 'npm':
-                    cli = source.parent.parent / 'lib/node_modules/npm/bin/npm-cli.js'
-                    if cli.exists():
-                        source = cli
-                (prefix / 'bin' / command).symlink_to(source)
-            other = prefix / 'lib/node_modules/preserve-package'
-            other.mkdir()
-            (other / 'package.json').write_text('{"name":"preserve-package","version":"1.0.0"}')
-            prefixes.append(prefix)
-        (self.home / '.local/bin').mkdir(parents=True)
-        (self.home / '.local/bin/claude').symlink_to(prefixes[-1] / 'bin/claude')
-        for _ in range(2):
-            result = self.provision()
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertEqual(self.run_claude('--version').returncode, 0)
-            for prefix in prefixes:
-                self.assertFalse((prefix / 'lib/node_modules/@anthropic-ai/claude-code').exists())
-                self.assertFalse((prefix / 'bin/claude').is_symlink())
-                self.assertTrue((prefix / 'lib/node_modules/preserve-package/package.json').exists())
-                self.assertTrue((prefix / 'bin/node').exists())
-            self.assertTrue((unmanaged / 'package.json').exists())
-            self.assert_state()
 
     def test_invalid_artifact_preserves_active_command_and_state(self):
         result = self.provision()

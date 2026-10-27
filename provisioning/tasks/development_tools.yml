@@ -116,7 +116,7 @@
     force: true
   loop: "{{ development_npm_packages }}"
 
-- name: Install standalone OpenCode and migrate the old npm installation
+- name: Install standalone OpenCode
   ansible.builtin.import_tasks: opencode.yml
 
 - name: Install standalone Salesforce CLI

@@ -2,6 +2,44 @@
 
 Run `./provision` from the repository root on macOS after creating and starting the VM. Lima owns the VM lifecycle; Provisioning never creates, starts, stops, or deletes a VM. See the [usage guide](./usage.md#operating-workflow) for lifecycle commands and targeting another instance.
 
+## Release compatibility and rebuilds
+
+`VERSION` identifies the Proteus release, starting at `1.0.0`. Versions use three
+canonical nonnegative integers (`major.minor.patch`, without leading zeroes,
+prerelease or build suffixes). The major version defines a rebuild boundary;
+minor and patch versions provide compatible additions and fixes. Vendor tools
+still update independently to their current releases during explicit Provisioning.
+
+Provisioning accepts fresh guests, repeated runs of the same release, and upgrades
+within the same major. It refuses every downgrade, a different major, corrupt
+version records, and previously provisioned unversioned guests. The guard runs
+before Python bootstrap, apt, or baseline changes through both `./provision` and
+direct `ansible-playbook provisioning/playbook.yml` runs, including task tags.
+An unversioned guest with the existing Proteus-owned `~/.local/share/proteus`
+namespace (mise, tools or Managed Dotfiles) requires a rebuild. Unrelated vendor
+installations or credential files alone do not identify an old Proteus baseline.
+
+The guest's `~/.local/state/proteus/accepted-version` records the **accepted**
+release before baseline changes, not successful completion. If Provisioning fails
+or is interrupted, fix the failure and rerun the same release; a failed upgrade
+still prevents downgrading. Do not remove or edit the marker to bypass the guard.
+A rejected run reports installed/accepted and requested versions with rebuild
+guidance. Fix an invalid repository `VERSION` by checking out a valid release;
+for incompatible or corrupt guest state, preserve project work and follow the
+[rebuild procedure](./usage.md#rebuild-proteus), then repeat Credential Enrollment.
+Provisioning never deletes or rebuilds a guest automatically.
+
+The first versioned baseline replaces former npm installations by requiring a
+fresh VM, without migrations. Compatible repeated Provisioning preserves project
+Node installations, credentials, application state, and the separately owned T3
+service. See [ADR 0008](./adr/0008-rebuild-instead-of-migrating-incompatible-baselines.md).
+
+Releases are deliberate: update `VERSION` for a release, commit and validate the
+baseline, then publish a matching Git tag such as `v1.0.0`. Ordinary commits do
+not each need a version change or tag. A breaking baseline change requires the
+next major version; compatible capabilities increment minor, fixes increment
+patch. Automated release publishing is not required.
+
 ## What a rebuild restores
 
 Provisioning applies the Development Baseline: the software and non-secret configuration needed for development. It uses Ansible for system state and tools, then installs `dotfiles/home` as one opaque Managed Dotfiles collection with GNU Stow. Ansible does not manage each application's configuration separately.
@@ -24,14 +62,11 @@ The Managed Dotfiles `opencode` launcher is exposed through `~/.local/bin` and
 flag and preserves PATH, arguments, and exit status. OpenCode needs no development
 Node runtime; its project subprocesses inherit the project's environment.
 
-Migration removes only `opencode-ai` from the Provisioning-owned baseline Node
-prefix and command symlinks targeting that old installation. It does not invoke
-`opencode uninstall`, remove other Node installations, or touch OpenCode
-configuration, credentials, skills, sessions, caches, or history. An unrelated
-user command at the Managed Dotfiles destination is preserved and reported as a
-Stow conflict; resolve that conflict before retrying. Keep updates owned by
-`./provision`; avoid separate npm installs or `opencode upgrade`, which would
-introduce a competing installation path. The installation uses the same official
+Provisioning preserves OpenCode configuration, credentials, skills, sessions,
+caches, and history. An unrelated user command at the Managed Dotfiles destination
+is reported as a Stow conflict; resolve it before retrying. Use `./provision` for
+updates and avoid separate npm installs or `opencode upgrade`.
+The installation uses the same official
 Linux archive as the [vendor installer](https://opencode.ai/install), without
 executing that installer or changing shell startup files.
 
@@ -57,13 +92,8 @@ when that project Node is absent. The launcher forces `SF_AUTOUPDATE_DISABLE=tru
 and `SF_DISABLE_AUTOUPDATE=true`, as well as the keychain and telemetry settings,
 including when inherited values conflict. Explicit Provisioning owns updates.
 
-Migration uninstalls obsolete `@salesforce/cli` global packages (including `sf`
-and `sfdx` commands) only from direct mise Node installation prefixes, including
-retained older versions, and removes the previous Proteus-owned `sf` and `node`
-launcher links. It preserves Node installations, unrelated packages, project-local
-or custom prefixes, `.sf`, `.sfdx`, enrolled credentials, plugins, and user state.
-Provisioning never performs Salesforce Credential Enrollment; the configured login
-URL, `devhub` alias, and default Dev Hub workflow remain unchanged.
+Provisioning preserves `.sf`, `.sfdx`, enrolled credentials, plugins and user
+state. Salesforce Credential Enrollment remains a separate explicit operation.
 
 Vendor references: [Salesforce CLI installation and archive manifests](https://developer.salesforce.com/docs/platform/sfdx-setup/guide/sfdx-setup-install-cli.html)
 and [disabling automatic updates](https://developer.salesforce.com/docs/platform/sfdx-setup/guide/sfdx-setup-disable-autoupdate.html).
@@ -79,15 +109,9 @@ The executable lives in `~/.local/share/proteus/claude/<version>/claude`;
 interactive shells, Credential Enrollment, and background services. It does not
 resolve project Node or rewrite the child-command environment.
 
-Migration uninstalls only `@anthropic-ai/claude-code` from retained mise Node
-prefixes (including earlier Development Baselines), using each prefix's own npm
-and Node. It replaces the obsolete command link without removing `~/.claude/`,
-`~/.claude.json`, settings, history, credentials, or other npm packages. An npm
-installation may already contain a native executable; this migration removes its
-installation lifecycle coupling to Node rather than claiming it needs Node to run.
-Installations outside the Provisioning-owned mise prefixes are left to the user.
-Old standalone version directories are retained so a running executable is not
-removed; they are versions of the same installation method.
+Provisioning preserves Claude configuration, credentials, settings, and history.
+Old standalone version directories are retained so a running executable remains
+available.
 
 Provisioning owns Claude Code updates. Managed settings set
 `env.DISABLE_AUTOUPDATER=1`, disabling independent background updates for all
@@ -115,12 +139,8 @@ native modules and assets), and checks `--version` before replacing command link
 No wrapper selects Node or modifies PATH, so project children inherit their
 original environment. Missing project Node does not prevent invoking the CLI.
 
-Migration uninstalls only `t3` from Provisioning-owned retained mise Node prefixes
-using each prefix's own npm and Node, then replaces the old command link. Other
-packages, project runtimes, T3 configuration, credentials, history, service units,
-and `~/.t3/runtime` are preserved. User installations outside these prefixes need
-manual cleanup if they shadow the managed command. Old standalone versions are
-retained to avoid removing executables still in use.
+T3 configuration, credentials, history, service units and `~/.t3/runtime` are
+preserved. Old standalone versions remain available to running processes.
 
 Provisioning owns CLI updates; use `./provision`. The current standalone CLI has
 explicit `t3 update`, rather than an independent automatic CLI updater to disable.

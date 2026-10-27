@@ -80,10 +80,23 @@ trap cleanup EXIT
 
 limactl start --tty=false "$instance"
 
+check_accepted_release() {
+  local accepted requested
+  requested="$(cat "$repository_root/VERSION")"
+  # HOME must resolve in the guest.
+  # shellcheck disable=SC2016
+  accepted="$(limactl shell --tty=false --start=false "$instance" sh -c 'cat "$HOME/.local/state/proteus/accepted-version"')"
+  [[ "$accepted" == "$requested" ]] || {
+    printf 'Expected accepted Proteus release %s, got %s.\n' "$requested" "$accepted" >&2
+    return 1
+  }
+}
+
 printf "Running Provisioning against '%s'.\n" "$instance"
 "$provision_command" "$instance"
+check_accepted_release
 
-# Seed tool migrations while the pinned baseline is still the global default.
+# Check fresh tool installs and seed dummy state for the repeated run.
 for phase in fresh prepare; do
   for tool in claude salesforce t3; do
     limactl shell --tty=false --start=false "$instance" python3 - "$phase" \
@@ -91,7 +104,7 @@ for phase in fresh prepare; do
   done
 done
 
-printf "Preparing OpenCode migration and preservation checks in '%s'.\n" "$instance"
+printf "Preparing OpenCode preservation checks in '%s'.\n" "$instance"
 limactl shell --tty=false --start=false "$instance" bash -s -- prepare < "$repository_root/tests/lima_opencode.sh"
 
 printf 'Checking interactive and systemd-background project Node selection in the disposable guest.\n'
@@ -99,8 +112,9 @@ node_workspace="$(limactl shell --tty=false --start=false "$instance" mktemp -d 
 limactl shell --tty=false --start=false "$instance" python3 - prepare "$node_workspace" \
   < "$repository_root/tests/lima_node_selection.py"
 
-printf "Repeating Provisioning against '%s' to verify Claude/OpenCode/Salesforce/T3 migration, service preservation, user state, and Node restoration.\n" "$instance"
+printf "Repeating Provisioning against '%s' to verify compatible release acceptance, service preservation, user state, and Node restoration.\n" "$instance"
 "$provision_command" "$instance"
+check_accepted_release
 for tool in claude salesforce t3; do
   limactl shell --tty=false --start=false "$instance" python3 - repeated \
     < "$repository_root/tests/${tool}_guest_acceptance.py"

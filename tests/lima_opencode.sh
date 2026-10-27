@@ -3,15 +3,10 @@
 set -euo pipefail
 
 state="$HOME/.cache/proteus/opencode-acceptance"
-prefix="$("$HOME/.local/bin/mise" where "node@$("$HOME/.local/bin/mise" config get --global tools.node)")"
 
 case "${1:-}" in
   prepare)
     mkdir -p "$state"
-    # Exercise migration from the real former npm distribution on the next run.
-    PATH="$prefix/bin:$PATH" "$prefix/bin/npm" install --global --no-audit --no-fund opencode-ai@latest
-    rm "$HOME/.local/bin/opencode"
-    ln -s "$prefix/bin/opencode" "$HOME/.local/bin/opencode"
     python3 - "$state" <<'PY'
 import hashlib
 import json
@@ -40,8 +35,6 @@ for relative, content in files.items():
 PY
     ;;
   check)
-    [[ ! -e "$prefix/lib/node_modules/opencode-ai" ]]
-    [[ ! -e "$prefix/bin/opencode" ]]
     python3 - "$state" <<'PY'
 import hashlib
 import json
@@ -72,7 +65,7 @@ PY
     actual="$(bash -ic 'command -v opencode >&2; opencode --version')"
     [[ "$actual" == "$expected" ]]
     [[ ! -d "$HOME/.local/share/mise/installs/node/99.0.0" ]]
-    printf 'OpenCode %s: vendor ARM64 binary, shell/background discovery, missing-Node independence, migration and user-state preservation passed.\n' "$actual"
+    printf 'OpenCode %s: vendor ARM64 binary, shell/background discovery, missing-Node independence, user-state preservation passed.\n' "$actual"
     ;;
   *) printf 'Expected prepare or check.\n' >&2; exit 2 ;;
 esac

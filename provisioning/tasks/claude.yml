@@ -45,7 +45,7 @@
     checksum: "sha256:{{ (claude_manifest.content | from_json).platforms['linux-arm64'].checksum }}"
     mode: "0755"
 
-# Validate before removing any old installation. No project Node resolution or
+# Validate before activating the installation. No project Node resolution or
 # credential enrollment is needed, even when a project requests a missing Node.
 - name: Verify the standalone Claude Code command
   ansible.builtin.command:
@@ -54,13 +54,6 @@
       - --version
   environment: "{{ managed_user_environment }}"
   changed_when: false
-
-# Provisioning previously installed this package into the pinned mise Node
-# prefix. Include older retained prefixes after a baseline version upgrade.
-- name: Remove obsolete Provisioning-owned Claude Code npm packages
-  ansible.builtin.import_tasks: migrate_npm_tool.yml
-  vars:
-    legacy_npm_package: '@anthropic-ai/claude-code'
 
 - name: Expose the standalone Claude Code command for interactive use
   ansible.builtin.file:

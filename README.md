@@ -2,6 +2,10 @@
 
 Proteus is a Rebuildable Dev VM for personal development on Apple silicon Macs, managed with Lima and Ansible. It provides development tools and dotfiles while isolating the guest from host directories and macOS credentials. Credentials are enrolled explicitly after Provisioning.
 
+Proteus releases start at `1.0.0` (`VERSION`). Repeated Provisioning and upgrades
+within the same major are supported; downgrades, different majors, and older
+unversioned guests require a fresh VM. See [release and rebuild policy](./docs/provisioning.md#release-compatibility-and-rebuilds).
+
 ## Quick start
 
 On an Apple silicon Mac with [Homebrew](https://brew.sh/), run these commands from the repository root in an interactive macOS terminal. Proteus requires Lima 2.2 or later. For GitHub enrollment, store a fine-grained personal access token and a dedicated SSH signing key in 1Password, and enter their field references when `./configure` prompts you. Register the public key with GitHub as a signing key once; enrollment restores the same key after a rebuild. See [Credentials](./docs/credentials.md#github). At its Salesforce login URL prompt, press Enter unless your org requires its My Domain URL.

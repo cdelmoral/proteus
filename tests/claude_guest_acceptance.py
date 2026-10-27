@@ -41,17 +41,7 @@ if phase == 'prepare':
     record.parent.mkdir(parents=True, exist_ok=True)
     record.write_text(json.dumps({name: hashlib.sha256((home / name).read_bytes()).hexdigest()
                                   for name in files}))
-    # Recreate the previous Provisioning method using the real vendor npm
-    # package. The second Provisioning must remove it without touching state.
-    baseline = run(str(home / '.local/bin/mise'), 'config', 'get', '--global', 'tools.node')
-    node = run(str(home / '.local/bin/mise'), 'where', 'node@' + baseline)
-    environment = {**os.environ, 'PATH': node + '/bin:/usr/bin:/bin'}
-    run(node + '/bin/npm', 'install', '--global', '--no-audit', '--no-fund',
-        '@anthropic-ai/claude-code@latest', env=environment)
-    command = home / '.local/bin/claude'
-    command.unlink()
-    command.symlink_to(Path(node) / 'bin/claude')
-    print('Seeded obsolete npm installation and dummy user state; no Credential Enrollment.')
+    print('Seeded dummy user state; no Credential Enrollment.')
 else:
     assert phase in ('fresh', 'repeated'), phase
     environment = {'HOME': str(home), 'PATH': '/usr/local/bin:/usr/bin:/bin',
@@ -95,6 +85,4 @@ else:
             assert hashlib.sha256((home / name).read_bytes()).hexdigest() == digest, name
         assert json.loads((home / '.claude/settings.json').read_text())['env']['PROTEUS_ACCEPTANCE_PRESERVED'] == 'yes'
         assert json.loads((home / '.claude.json').read_text())['proteusAcceptance'] == 'preserve-enrollment-state'
-        assert not list((home / '.local/share/mise/installs/node').glob('*/lib/node_modules/@anthropic-ai/claude-code'))
-        assert not list((home / '.local/share/mise/installs/node').glob('*/bin/claude'))
     print(f'Claude {phase} acceptance passed: {version}; ARM64, system PATH, skills, auth status, Node independence.')

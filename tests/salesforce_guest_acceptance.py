@@ -34,14 +34,7 @@ if phase == 'prepare':
         path.write_text(content)
     record.write_text(json.dumps({name: hashlib.sha256((home / name).read_bytes()).hexdigest()
                                  for name in files}))
-    baseline = run(mise, 'config', 'get', '--global', 'tools.node')
-    node = run(mise, 'where', 'node@' + baseline)
-    run(node + '/bin/npm', 'install', '--global', '--no-audit', '--no-fund',
-        '@salesforce/cli@latest', env={**os.environ, 'PATH': node + '/bin:/usr/bin:/bin'})
-    legacy = home / '.local/share/proteus/salesforce-cli'
-    (legacy / 'sf').symlink_to(Path(node) / 'bin/sf')
-    (legacy / 'node').symlink_to(Path(node) / 'bin/node')
-    print('Seeded obsolete Salesforce npm package and dummy state; no Credential Enrollment.')
+    print('Seeded dummy Salesforce state; no Credential Enrollment.')
 else:
     assert phase in ('fresh', 'repeated'), phase
     version = run('sf', '--version', env=environment)
@@ -87,8 +80,5 @@ else:
     if phase == 'repeated':
         for name, digest in json.loads(record.read_text()).items():
             assert hashlib.sha256((home / name).read_bytes()).hexdigest() == digest, name
-        assert not list((home / '.local/share/mise/installs/node').glob('*/lib/node_modules/@salesforce/cli'))
-        assert not list((home / '.local/share/mise/installs/node').glob('*/bin/sf'))
-        assert not list((home / '.local/share/mise/installs/node').glob('*/bin/sfdx'))
         run(mise, 'where', 'node@22.16.0')
     print(f'Salesforce {phase} passed: {version}; ARM64, background PATH, Node independence, no enrollment.')

@@ -29,15 +29,8 @@ class OpenCodeProvisioningTest(unittest.TestCase):
         self.directory = Path(self.temporary.name)
         self.home = self.directory / 'guest'
         self.home.mkdir()
-        self.prefix = self.home / 'baseline'
-        self.package = self.prefix / 'lib/node_modules/opencode-ai'
-        (self.package / 'bin').mkdir(parents=True)
-        (self.package / 'bin/opencode').write_text('old npm command')
-        (self.prefix / 'bin').mkdir()
-        (self.prefix / 'bin/opencode').symlink_to('../lib/node_modules/opencode-ai/bin/opencode')
         self.command = self.home / '.local/bin/opencode'
         self.command.parent.mkdir(parents=True)
-        self.command.symlink_to(self.prefix / 'bin/opencode')
         self.state = {}
         for relative in ['.config/opencode/opencode.json', '.local/share/opencode/auth.json',
                          '.local/state/opencode/history', '.cache/opencode/cache',
@@ -61,13 +54,12 @@ class OpenCodeProvisioningTest(unittest.TestCase):
         self.variables = {
             'ansible_facts': {'system': 'Linux', 'architecture': 'aarch64', 'user_dir': str(self.home)},
             'ansible_python_interpreter': os.sys.executable,
-            'managed_node': {'stdout': str(self.prefix)},
             'opencode_release_url': self.url + '/release.json',
         }
 
     def release(self, version, digest=None, broken=False):
         # Simulate only the vendor binary; Ansible downloads, digest verification,
-        # extraction, migration, and launcher execution are real.
+        # extraction and launcher execution are real.
         binary = (f'#!/bin/sh\necho {version}\n' if not broken else '#!/bin/sh\nexit 42\n').encode()
         archive = self.directory / 'opencode.tar.gz'
         with tarfile.open(archive, 'w:gz') as output:
@@ -92,7 +84,7 @@ class OpenCodeProvisioningTest(unittest.TestCase):
         for path, content in self.state.items():
             self.assertEqual(path.read_bytes(), content)
 
-    def test_migrates_repeats_and_updates_preserving_state(self):
+    def test_installs_repeats_and_updates_preserving_state(self):
         for version in ['1.2.3', '1.2.3', '1.2.4']:
             self.release(version)
             result = self.provision()
@@ -104,8 +96,6 @@ class OpenCodeProvisioningTest(unittest.TestCase):
                 'HOME': str(self.home), 'PATH': str(self.command.parent)}, capture_output=True, text=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout.strip(), version)
-            self.assertFalse(self.package.exists())
-            self.assertFalse((self.prefix / 'bin/opencode').is_symlink())
             self.assert_state()
 
     def test_failed_download_or_candidate_preserves_previous_installation(self):
@@ -117,7 +107,6 @@ class OpenCodeProvisioningTest(unittest.TestCase):
             self.release('1.2.4', **options)
             result = self.provision()
             self.assertNotEqual(result.returncode, 0)
-            self.assertEqual(self.command.read_text(), 'old npm command')
             self.assertEqual(installed.read_bytes(), b'previous standalone installation')
             self.assert_state()
 
@@ -125,10 +114,8 @@ class OpenCodeProvisioningTest(unittest.TestCase):
         result = self.provision(ansible_facts={
             'system': 'Linux', 'architecture': 'x86_64', 'user_dir': str(self.home)})
         self.assertNotEqual(result.returncode, 0)
-        self.assertTrue(self.package.exists())
         custom = self.home / 'custom-opencode'
         custom.write_text('user command')
-        self.command.unlink()
         self.command.symlink_to(custom)
         result = self.provision()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

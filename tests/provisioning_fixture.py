@@ -39,9 +39,6 @@ def prepare_playbook(test, tool, replacements=()):
     for original, replacement in replacements:
         source = source.replace(original, replacement)
     tasks.write_text(source)
-    # Relative imports resolve beside the copied task under test.
-    shared = 'migrate_npm_tool.yml'
-    (test.directory / shared).write_text((ROOT / 'provisioning/tasks' / shared).read_text())
     test.playbook = test.directory / 'playbook.yml'
     test.playbook.write_text(json.dumps([{
         'name': 'Exercise standalone tool Provisioning', 'hosts': 'all', 'gather_facts': False,

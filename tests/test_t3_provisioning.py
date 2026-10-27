@@ -2,7 +2,6 @@
 import hashlib
 import json
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import tarfile
@@ -108,49 +107,6 @@ else:
             self.assertEqual(child.returncode, 42 if selection == 'missing' else 0)
             if selection != 'missing':
                 self.assertEqual(child.stdout.strip(), selection)
-
-    @unittest.skipUnless(shutil.which('npm') and shutil.which('node'), 'npm is required for migration')
-    def test_migrates_real_npm_packages_from_retained_node_prefixes(self):
-        # A nested project/global prefix is not a Provisioning-owned install.
-        unmanaged = (self.home / '.local/share/mise/installs/node/22.0.0'
-                     / 'workspace/lib/node_modules/t3')
-        unmanaged.mkdir(parents=True)
-        (unmanaged / 'package.json').write_text('{"name":"t3"}')
-        prefixes = []
-        for version in ('22.0.0', '24.0.0'):
-            prefix = self.home / '.local/share/mise/installs/node' / version
-            package = prefix / 'lib/node_modules/t3'
-            package.mkdir(parents=True)
-            (package / 'package.json').write_text(json.dumps({
-                'name': 't3', 'version': '0.0.0',
-                'bin': {'t3': 'cli.js'}}))
-            (package / 'cli.js').write_text('obsolete-distribution')
-            (prefix / 'bin').mkdir()
-            (prefix / 'bin/t3').symlink_to(package / 'cli.js')
-            for command in ('npm', 'node'):
-                source = Path(shutil.which(command)).resolve()
-                if command == 'npm':
-                    cli = source.parent.parent / 'lib/node_modules/npm/bin/npm-cli.js'
-                    if cli.exists():
-                        source = cli
-                (prefix / 'bin' / command).symlink_to(source)
-            other = prefix / 'lib/node_modules/preserve-package'
-            other.mkdir()
-            (other / 'package.json').write_text('{"name":"preserve-package","version":"1.0.0"}')
-            prefixes.append(prefix)
-        (self.home / '.local/bin').mkdir(parents=True)
-        (self.home / '.local/bin/t3').symlink_to(prefixes[-1] / 'bin/t3')
-        for _ in range(2):
-            result = self.provision()
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertEqual(self.run_t3('--version').returncode, 0)
-            for prefix in prefixes:
-                self.assertFalse((prefix / 'lib/node_modules/t3').exists())
-                self.assertFalse((prefix / 'bin/t3').is_symlink())
-                self.assertTrue((prefix / 'lib/node_modules/preserve-package/package.json').exists())
-                self.assertTrue((prefix / 'bin/node').exists())
-            self.assertTrue((unmanaged / 'package.json').exists())
-            self.assert_state()
 
     def test_invalid_artifact_preserves_active_command_and_state(self):
         result = self.provision()

@@ -79,6 +79,13 @@ GitHub Credential Enrollment preserves this identity and unrelated preferences w
 
 ## Rebuild Proteus
 
+A different Proteus major version, any downgrade, or an older unversioned guest
+requires a fresh VM. Provisioning reports accepted and requested versions and
+stops before baseline changes; it never performs the rebuild automatically.
+The same release and higher minor/patch releases within its major support
+repeated Provisioning. See [release compatibility](./provisioning.md#release-compatibility-and-rebuilds),
+including how to retry interrupted runs.
+
 Deleting Proteus permanently removes its repositories, uncommitted work, VM-Local Credentials, Host-Injected Credentials, and other guest state.
 
 If T3 was enrolled, deregister the old environment from your T3 Connect account before rebuilding, or afterward if it has already been wiped. Removing it only from a device's connections does not deregister it. Proteus does not automate cloud cleanup. See [T3 Enrollment](./credentials.md#t3-code).

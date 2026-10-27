@@ -62,16 +62,8 @@ if phase == 'prepare':
     secret = base / 'userdata/secrets/proteus-acceptance'
     secret.parent.mkdir(parents=True, exist_ok=True)
     secret.write_text('not-a-credential\n')
-    # Recreate the previous Provisioning-owned npm installation/link.
-    baseline = run(str(home / '.local/bin/mise'), 'config', 'get', '--global', 'tools.node')
-    node = run(str(home / '.local/bin/mise'), 'where', 'node@' + baseline)
-    run(node + '/bin/npm', 'install', '--global', '--no-audit', '--no-fund', 't3@latest',
-        env={**environment, 'PATH': node + '/bin:' + environment['PATH']})
-    command = home / '.local/bin/t3'
-    command.unlink()
-    command.symlink_to(Path(node) / 'bin/t3')
     record.write_text(json.dumps({'service': service(), 'files': snapshot()}))
-    print('T3: seeded legacy npm link and dummy state beside a real unauthenticated local service.')
+    print('T3: seeded dummy state beside a real unauthenticated local service.')
 else:
     assert phase in ('fresh', 'repeated'), phase
     version = run('t3', '--version')
@@ -101,6 +93,4 @@ else:
         before = json.loads(record.read_text())
         assert service() == before['service'], 'Provisioning restarted or changed the service'
         assert snapshot() == before['files'], 'Provisioning changed runtime, unit, configuration, or dummy state'
-        assert not list((home / '.local/share/mise/installs/node').glob('*/lib/node_modules/t3'))
-        assert not list((home / '.local/share/mise/installs/node').glob('*/bin/t3'))
     print(f'T3 {phase} acceptance passed: {version}; ARM64, system PATH, Node independence, service preservation.')

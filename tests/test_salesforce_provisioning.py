@@ -4,7 +4,6 @@ import http.server
 import io
 import json
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import tarfile
@@ -56,7 +55,7 @@ class SalesforceProvisioningTest(unittest.TestCase):
     def publish(self, version, bad_digest=False, broken=False):
         archive_path = self.vendor / (version + '.tar.xz')
         # Simulate only vendor files. Real tasks download, verify, extract,
-        # invoke the runtime, migrate npm, and activate the new release.
+        # invoke the runtime and activate the new release.
         files = {
             'sf/bin/node': f'#!{os.sys.executable}\nimport os,sys\nassert sys.argv[1] == "--no-deprecation"\nos.execv(sys.argv[2], sys.argv[2:])\n',
             'sf/bin/run.js': f'''#!{os.sys.executable}
@@ -119,50 +118,3 @@ sys.exit({7 if broken else 0})
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse((self.home / '.local/share/proteus/salesforce-cli/current').exists())
         self.assert_state()
-
-    @unittest.skipUnless(shutil.which('npm') and shutil.which('node'), 'npm is required for migration')
-    def test_migrates_only_managed_global_npm_packages(self):
-        prefixes = []
-        for version in ('22.0.0', '24.0.0'):
-            prefix = self.home / '.local/share/mise/installs/node' / version
-            package = prefix / 'lib/node_modules/@salesforce/cli'
-            package.mkdir(parents=True)
-            (package / 'package.json').write_text(json.dumps({
-                'name': '@salesforce/cli', 'version': '0.0.0',
-                'bin': {'sf': 'bin.js', 'sfdx': 'bin.js'}}))
-            (package / 'bin.js').write_text('obsolete-package')
-            (prefix / 'bin').mkdir()
-            for command in ('sf', 'sfdx'):
-                (prefix / 'bin' / command).symlink_to(package / 'bin.js')
-            for command in ('npm', 'node'):
-                source = Path(shutil.which(command)).resolve()
-                if command == 'npm':
-                    cli = source.parent.parent / 'lib/node_modules/npm/bin/npm-cli.js'
-                    if cli.exists():
-                        source = cli
-                (prefix / 'bin' / command).symlink_to(source)
-            other = prefix / 'lib/node_modules/preserve-package'
-            other.mkdir()
-            (other / 'package.json').write_text('{"name":"preserve-package","version":"1.0.0"}')
-            prefixes.append(prefix)
-        unmanaged = prefixes[0] / 'workspace/lib/node_modules/@salesforce/cli/package.json'
-        unmanaged.parent.mkdir(parents=True)
-        unmanaged.write_text('{"name":"@salesforce/cli"}')
-        legacy = self.home / '.local/share/proteus/salesforce-cli'
-        legacy.mkdir(parents=True)
-        (legacy / 'sf').symlink_to(prefixes[-1] / 'bin/sf')
-        (legacy / 'node').symlink_to(prefixes[-1] / 'bin/node')
-        for _ in range(2):
-            result = self.provision()
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertEqual(self.sf().returncode, 0)
-            for prefix in prefixes:
-                self.assertFalse((prefix / 'lib/node_modules/@salesforce/cli').exists())
-                for command in ('sf', 'sfdx'):
-                    self.assertFalse((prefix / 'bin' / command).is_symlink())
-                self.assertTrue((prefix / 'bin/node').exists())
-                self.assertTrue((prefix / 'lib/node_modules/preserve-package/package.json').exists())
-            self.assertFalse((legacy / 'sf').is_symlink())
-            self.assertFalse((legacy / 'node').is_symlink())
-            self.assertTrue(unmanaged.exists())
-            self.assert_state()

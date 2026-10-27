@@ -55,7 +55,7 @@
     dest: "{{ salesforce_release_dir }}"
     remote_src: true
 
-- name: Verify Salesforce CLI with its bundled runtime before migration
+- name: Verify Salesforce CLI with its bundled runtime before activation
   ansible.builtin.command:
     argv:
       - "{{ salesforce_release_dir }}/sf/bin/node"
@@ -70,29 +70,6 @@
       "SF_DISABLE_AUTOUPDATE": "true"
     }) }}
   changed_when: false
-
-# Only direct global packages in retained mise Node prefixes were installed by
-# Provisioning. Do not traverse into project-local or custom npm prefixes.
-- name: Remove obsolete Provisioning-owned Salesforce CLI npm packages
-  ansible.builtin.import_tasks: migrate_npm_tool.yml
-  vars:
-    legacy_npm_package: '@salesforce/cli'
-
-- name: Inspect obsolete Salesforce launcher links
-  ansible.builtin.stat:
-    path: "{{ salesforce_cli_dir }}/{{ item }}"
-    follow: false
-  loop:
-    - sf
-    - node
-  register: salesforce_legacy_links
-
-- name: Remove obsolete Provisioning-owned Salesforce launcher links
-  ansible.builtin.file:
-    path: "{{ item.stat.path }}"
-    state: absent
-  loop: "{{ salesforce_legacy_links.results }}"
-  when: item.stat.islnk | default(false)
 
 - name: Activate the standalone Salesforce CLI release
   ansible.builtin.file:

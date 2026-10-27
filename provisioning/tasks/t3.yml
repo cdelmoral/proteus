@@ -55,7 +55,7 @@
     extra_opts: [--strip-components=1]
     creates: "{{ t3_install_dir }}/{{ t3_version }}/.install-complete"
 
-- name: Verify the standalone T3 CLI before migration
+- name: Verify the standalone T3 CLI before activation
   ansible.builtin.command:
     argv:
       - timeout
@@ -71,11 +71,6 @@
     dest: "{{ t3_install_dir }}/{{ t3_version }}/.install-complete"
     content: "{{ t3_version }}\n"
     mode: "0644"
-
-- name: Remove obsolete Provisioning-owned T3 npm packages
-  ansible.builtin.import_tasks: migrate_npm_tool.yml
-  vars:
-    legacy_npm_package: t3
 
 - name: Expose the standalone T3 CLI for interactive use
   ansible.builtin.file:

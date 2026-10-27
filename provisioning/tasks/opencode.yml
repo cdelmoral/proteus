@@ -35,7 +35,7 @@
     prefix: proteus-opencode-
   register: opencode_staging
 
-- name: Verify and install OpenCode before removing the old installation
+- name: Verify and install OpenCode before activation
   block:
     - name: Download the verified OpenCode archive
       ansible.builtin.get_url:
@@ -70,32 +70,3 @@
       ansible.builtin.file:
         path: "{{ opencode_staging.path }}"
         state: absent
-
-# Only the old Provisioning-owned baseline prefix is eligible for cleanup.
-# Never run the vendor uninstaller: it can remove application state.
-- name: Inspect obsolete OpenCode command links
-  ansible.builtin.stat:
-    path: "{{ item }}"
-    follow: false
-  loop:
-    - "{{ managed_node.stdout | trim }}/bin/opencode"
-    - "{{ ansible_facts.user_dir }}/.local/bin/opencode"
-  register: opencode_old_links
-
-- name: Remove only links to the obsolete managed npm installation
-  ansible.builtin.file:
-    path: "{{ item.item }}"
-    state: absent
-  loop: "{{ opencode_old_links.results }}"
-  when:
-    - item.stat.islnk | default(false)
-    - >-
-      item.stat.lnk_source in [
-        (managed_node.stdout | trim) ~ '/bin/opencode',
-        (managed_node.stdout | trim) ~ '/lib/node_modules/opencode-ai/bin/opencode'
-      ]
-
-- name: Remove the obsolete baseline OpenCode npm package
-  ansible.builtin.file:
-    path: "{{ managed_node.stdout | trim }}/lib/node_modules/opencode-ai"
-    state: absent
