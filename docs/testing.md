@@ -10,7 +10,7 @@ Teamwork Graph tests run the real enrollment helper and simulate TWG and lingeri
 
 Salesforce tests run the real launcher, enrollment helper, and URL-capture script in the guest home and simulate only the standalone Salesforce CLI, which opens its authorization URL through `BROWSER` as Salesforce CLI does. They cover login, browser-launch, and verification failures, repeat enrollment, and VM and terminal checks. Configuration tests drive `./configure` to save, keep, and reject Salesforce login URLs while preserving the GitHub references, and confirm the saved URL or the standard default reaches Salesforce CLI. Salesforce CLI tests run the managed `sf` launcher from the system PATH without shell startup and simulate only the archive runtime and CLI, verifying keychain, telemetry and updater settings, argument forwarding, failure propagation, and unchanged child PATH across installed and missing project runtimes. Salesforce Provisioning tests run real Ansible tasks against a local manifest and archive, including digest/runtime failures, repeat runs, upgrades, obsolete npm cleanup, and preservation of dummy user state.
 
-T3 tests simulate systemd, lingering, and provider-independent Connect setup, including partial failures, retries, and existing-server protection. They verify completion from saved Connect configuration and systemd persistence, including links saved after startup and healthy services without private runtime metadata.
+T3 tests simulate systemd, lingering, and provider-independent Connect setup, including partial failures, retries, and existing-server protection. They verify completion from saved Connect configuration and systemd persistence, including links saved after startup and healthy services without private runtime metadata. Focused Provisioning tests execute the real Ansible tasks with local release archives/checksums and real npm migration across retained Node prefixes. They cover upgrades, invalid artifacts/selectors, preserved service files and credentials, direct enrollment without mise, and inherited project child PATH.
 
 GitHub credential tests require Git, GitHub CLI, and OpenSSH. They exercise real credential lookup with dummy tokens and real signing with temporary keys, without network access. They cover background Git and `gh` commands, commit signing without a terminal or SSH agent, identity preservation, reprovisioning, credential rotation, invalid or encrypted keys, rejected tokens, missing references, and failed secret reads. Configure tests cover reference examples, preserving both defaults, upgrading token-only configuration, and interrupted input.
 
@@ -55,7 +55,7 @@ The disposable guest must have a functioning systemd user manager; failure to
 launch a transient service fails acceptance rather than substituting a fixture.
 This requires no T3 enrollment and does not touch an existing T3 service.
 
-Claude, Salesforce, and OpenCode migration fixtures are seeded before Node assertions change the global default. The shared repeated run must migrate their obsolete npm installations and preserve each tool's user state, restore the pinned Node default, and retain usable additional project versions. No real Credential Enrollment is performed. Setup, assertions, Provisioning, and cleanup failures fail the command. This checks observable behavior rather than exact convergence of all Provisioning tasks.
+Claude, Salesforce, OpenCode, and T3 migration fixtures are seeded before Node assertions change the global default. The shared repeated run must migrate their obsolete npm installations and preserve each tool's user state, restore the pinned Node default, and retain usable additional project versions. No real Credential Enrollment is performed. Setup, assertions, Provisioning, and cleanup failures fail the command. This checks observable behavior rather than exact convergence of all Provisioning tasks.
 
 Focused Claude tests execute the actual Ansible tasks with a local HTTP vendor fixture and real npm migration across retained Node prefixes. They exercise upgrades, checksum/selector failures, user-state preservation, and child environment preservation. Enrollment subprocess tests confirm that login/status no longer require mise. These fixtures do not prove Linux ARM64 vendor compatibility or real authentication.
 
@@ -88,6 +88,47 @@ OpenCode must launch from a temporary project requesting an uninstalled Node
 version without installing it; a failing Node executable on the background PATH
 detects accidental runtime coupling.
 
+Integrated #51–#56 merge validation (2026-10-27, Linux ARM64): `make static`
+passed, and the bounded full discovery suite completed 143 tests with zero
+failures and nine prerequisite skips. All nine passed separately: six Node tests
+with `PROTEUS_TEST_MISE` pointing to pinned mise 2026.9.1, plus the Claude,
+Salesforce, and T3 npm migration tests with the existing Node 24.20.0 runtime on
+PATH. Every run unset `T3CODE_HOME`; the full suite used a controlled system/tool
+PATH without project Node. Static/full-suite timeouts were 180/600 seconds;
+focused Node/migration runs were bounded at 120/240 seconds. No real Lima,
+Connect enrollment, or enrolled-service acceptance was performed by this merge.
+
+T3 assertions in `tests/t3_guest_acceptance.py` check the real archive's ARM64
+executable, interactive/system-PATH invocation with blocked project Node, and
+unauthenticated Connect status. Explicit test setup then installs a real local
+systemd service bound to loopback, seeds dummy state and the obsolete npm link,
+and records process identity, runtime hashes, service unit, and configuration.
+Repeat production Provisioning must migrate npm while preserving those records.
+This service is **not Connect-enrolled**; automated acceptance never authorizes
+Connect or uses real credentials. Subprocesses and service readiness waits are
+bounded.
+
+T3 Linux ARM64 host artifact check (2026-10-27): **passed** using the actual
+Ansible task file against official `v0.1.3` release endpoints, an isolated home,
+and redirected command links. Checksum verification, full extraction, ELF ARM64
+identification, `--version`, and preservation of seeded service/state files passed.
+The first attempts in RAM-backed `/tmp` timed out under severe memory pressure;
+using disk-backed temporary storage resolved that resource constraint. This did
+not install a real service or perform Connect enrollment.
+
+T3 guest acceptance evidence: **unrun** on the Linux implementation host.
+Run `make lima-acceptance` on macOS and record date, guest architecture, CLI and
+service versions, and fresh/repeated outcomes. Separately, on an owner-authorized
+Connect-enrolled guest, record `systemctl --user show t3code.service` process
+identity/start time, active/enabled state, service runtime selection and hashes,
+and hashes of credentials/configuration before and after `./provision`. Confirm
+these remain unchanged and an existing remote connection continues working,
+including when the service version differs from the CLI. Do not print credential
+contents in the evidence. That enrolled-service case, real Connect onboarding and
+retry, logout/reboot persistence, and background agent project Node resolution
+remain **unrun** here; fixtures and the unauthenticated local service do not prove
+them. See the #52 acceptance procedure above for the integrated Node-resolution checks.
+
 The check refuses to adopt an existing instance and deletes the VM it created after success or failure. It disables development-port forwarding for that VM, so the normal `proteus` instance may remain running.
 
 To verify GitHub Credential Enrollment manually on macOS, configure both 1Password references and register the signing public key with GitHub once. Create and start a fresh VM, run `./provision`, run `./enroll github`, and enter a new guest shell. Confirm `gh auth status` and one HTTPS Git operation succeed. Repeat the Git operation and `gh api user --silent` through non-interactive guest commands with `GH_TOKEN` and `GITHUB_TOKEN` unset, and again after Provisioning. Confirm both a private project clone and a GitHub CLI command through T3's background service succeed. Make a commit with the existing Git identity through T3 and confirm GitHub shows its signature as verified. Repeat enrollment and Provisioning and confirm signing still works. Do not print or inspect the token or private key.
@@ -98,7 +139,7 @@ For Teamwork Graph, run `./enroll twg`, authorize your personal account through 
 
 For T3, run `./enroll t3` on a fresh provisioned VM from an interactive macOS terminal. Accept relay-client and service installation, approve the browser code, and confirm local verification completes. Sign in to the same T3 Connect account from another device and connect to the environment. Close the guest shell, then stop/start the VM; confirm the service and remote access return without running enrollment again. Authenticate a provider separately to run agent work.
 
-Repeat T3 enrollment and confirm it leaves the running service untouched. Verify that a service on a different version from the npm CLI still passes when healthy. Decline or interrupt setup, confirm incomplete setup is reported, and retry using the saved authorization. Start a foreground server and confirm enrollment refuses takeover. For a running service started before Connect was enabled, confirm enrollment saves authorization and environment linking without restarting it or rejecting the new link's timestamp. Verify remote access from another device; if activation needs a restart, perform it explicitly when ready. After deleting the VM, deregister its old cloud environment and enroll the replacement afresh.
+Repeat T3 enrollment and confirm it leaves the running service untouched. Verify that a service on a different version from the standalone CLI still passes when healthy. Decline or interrupt setup, confirm incomplete setup is reported, and retry using the saved authorization. Start a foreground server and confirm enrollment refuses takeover. For a running service started before Connect was enabled, confirm enrollment saves authorization and environment linking without restarting it or rejecting the new link's timestamp. Verify remote access from another device; if activation needs a restart, perform it explicitly when ready. After deleting the VM, deregister its old cloud environment and enroll the replacement afresh.
 
 The existing `make lima-acceptance` flow also verifies Salesforce's real Linux
 ARM64 archive, system PATH and user-systemd background availability, launches with

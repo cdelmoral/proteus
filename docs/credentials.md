@@ -55,7 +55,7 @@ After Provisioning, run this command from an interactive macOS terminal:
 ./enroll t3
 ```
 
-On a fresh guest, Proteus runs `t3 connect --headless` using the managed runtime. Accept T3's relay-client and background-service installation prompts. Open its authorization URL in your macOS browser, confirm the short code, and approve access. T3 completes authorization inside the guest without an OAuth callback port forward. It owns storage and renewal of the resulting VM-Local Credential; Proteus does not copy host T3 credentials or capture the authorization code. This is T3's documented [remote sign-in flow](https://github.com/pingdotgg/t3code/blob/main/docs/user/remote-access.md#t3-connect).
+On a fresh guest, Proteus runs `t3 connect --headless` using the standalone CLI directly. Accept T3's relay-client and background-service installation prompts. Open its authorization URL in your macOS browser, confirm the short code, and approve access. T3 completes authorization inside the guest without an OAuth callback port forward. It owns storage and renewal of the resulting VM-Local Credential; Proteus does not copy host T3 credentials or capture the authorization code. This is T3's documented [remote sign-in flow](https://github.com/pingdotgg/t3code/blob/main/docs/user/remote-access.md#t3-connect).
 
 Enrollment requires terminal input and output and an already running, provisioned instance. It does not need 1Password or the configured GitHub credential source, and never changes the VM lifecycle. Provider Credential Enrollment is separate: run `./enroll claude` when using Claude through T3.
 
@@ -73,7 +73,7 @@ Repeated enrollment leaves a completed, healthy setup unchanged, even when its s
 
 If enrollment completes but remote access fails, inspect `t3 connect status`, `t3 service status`, and the service log in the guest. Newly saved authorization or link configuration may require `t3 service restart` when you can interrupt current work. Enrollment does not infer that requirement from file timestamps.
 
-Provisioning updates the npm CLI without updating or restarting an enrolled service. Service upgrades are explicit operations through T3's commands. [T3's service documentation](https://github.com/pingdotgg/t3code/blob/main/docs/user/background-service.md) describes updates, recovery, and removal. Signing out with `t3 connect logout` clears Connect authorization but does not uninstall the service; `t3 connect unlink` retains the login while disabling exposure.
+Provisioning updates only the standalone CLI without updating or restarting an enrolled service. Service upgrades are explicit operations through T3's commands. [T3's service documentation](https://github.com/pingdotgg/t3code/blob/main/docs/user/background-service.md) describes updates, recovery, and removal. Signing out with `t3 connect logout` clears Connect authorization but does not uninstall the service; `t3 connect unlink` retains the login while disabling exposure.
 
 Deleting the VM removes its local credentials and service. Before a rebuild, deregister its old environment through the account's T3 Connect page; you can also deregister an already wiped environment. Forgetting it in a device's connection list is insufficient. Enroll the replacement VM afresh; Proteus does not automate cloud deregistration.
 

@@ -48,8 +48,10 @@ development_tool_packages:
 development_npm_packages:
   - package: pnpm
     command: pnpm
-  - package: t3
-    command: t3
+
+t3_release_url: https://github.com/pingdotgg/t3code/releases/latest
+t3_distribution_url: https://github.com/pingdotgg/t3code/releases/download
+t3_install_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/t3"
 
 claude_distribution_url: https://downloads.claude.ai/claude-code-releases
 claude_install_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/claude"

@@ -122,6 +122,9 @@
 - name: Install standalone Salesforce CLI
   ansible.builtin.import_tasks: salesforce.yml
 
+- name: Install the standalone T3 CLI
+  ansible.builtin.import_tasks: t3.yml
+
 - name: Install standalone Claude Code and its public skills
   ansible.builtin.import_tasks: claude.yml
 

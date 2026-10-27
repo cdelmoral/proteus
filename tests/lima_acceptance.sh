@@ -68,10 +68,10 @@ printf "Running Provisioning against '%s'.\n" "$instance"
 
 # Seed tool migrations while the pinned baseline is still the global default.
 for phase in fresh prepare; do
-  limactl shell --tty=false --start=false "$instance" python3 - "$phase" \
-    < "$repository_root/tests/claude_guest_acceptance.py"
-  limactl shell --tty=false --start=false "$instance" python3 - "$phase" \
-    < "$repository_root/tests/salesforce_guest_acceptance.py"
+  for tool in claude salesforce t3; do
+    limactl shell --tty=false --start=false "$instance" python3 - "$phase" \
+      < "$repository_root/tests/${tool}_guest_acceptance.py"
+  done
 done
 
 printf "Preparing OpenCode migration and preservation checks in '%s'.\n" "$instance"
@@ -82,12 +82,12 @@ node_workspace="$(limactl shell --tty=false --start=false "$instance" mktemp -d 
 limactl shell --tty=false --start=false "$instance" python3 - prepare "$node_workspace" \
   < "$repository_root/tests/lima_node_selection.py"
 
-printf "Repeating Provisioning against '%s' to verify Claude/OpenCode/Salesforce migration, user state, and Node restoration.\n" "$instance"
+printf "Repeating Provisioning against '%s' to verify Claude/OpenCode/Salesforce/T3 migration, service preservation, user state, and Node restoration.\n" "$instance"
 "$provision_command" "$instance"
-limactl shell --tty=false --start=false "$instance" python3 - repeated \
-  < "$repository_root/tests/claude_guest_acceptance.py"
-limactl shell --tty=false --start=false "$instance" python3 - repeated \
-  < "$repository_root/tests/salesforce_guest_acceptance.py"
+for tool in claude salesforce t3; do
+  limactl shell --tty=false --start=false "$instance" python3 - repeated \
+    < "$repository_root/tests/${tool}_guest_acceptance.py"
+done
 limactl shell --tty=false --start=false "$instance" python3 - verify "$node_workspace" \
   < "$repository_root/tests/lima_node_selection.py"
 limactl shell --tty=false --start=false "$instance" bash -s -- check < "$repository_root/tests/lima_opencode.sh"
