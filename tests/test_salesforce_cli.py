@@ -10,8 +10,8 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-# Provisioning links the npm-installed CLI and managed Node here, outside the user PATH.
-CLI_DIR = ".local/share/proteus/salesforce-cli"
+# Provisioning installs the official archive here, outside the user PATH.
+CLI_DIR = ".local/share/proteus/salesforce-cli/current/bin"
 
 
 class SalesforceCliTest(unittest.TestCase):
@@ -21,18 +21,22 @@ class SalesforceCliTest(unittest.TestCase):
         self.home = Path(self.temporary.name)
         shutil.copytree(ROOT / "dotfiles/home", self.home, dirs_exist_ok=True)
         self.log = self.home / "sf-calls.jsonl"
-        # Only managed Node and the npm-installed CLI are simulated. The
+        # Only the archive runtime and CLI are simulated. The
         # launcher runs unchanged.
         self.write_command(self.home / CLI_DIR / "node", """
 import os, sys
-os.environ['TEST_RUNTIME'] = 'managed-node'
-os.execv(sys.argv[1], sys.argv[1:])
+os.environ['TEST_RUNTIME'] = 'bundled-node'
+assert sys.argv[1] == "--no-deprecation"
+os.execv(sys.argv[2], sys.argv[2:])
 """)
-        self.write_command(self.home / CLI_DIR / "sf", """
+        self.write_command(self.home / CLI_DIR / "run.js", """
 import json, os, sys
-names = ('SF_USE_GENERIC_UNIX_KEYCHAIN', 'SF_DISABLE_TELEMETRY', 'TEST_RUNTIME')
+names = ('SF_USE_GENERIC_UNIX_KEYCHAIN', 'SF_DISABLE_TELEMETRY', 'SF_AUTOUPDATE_DISABLE', 'SF_DISABLE_AUTOUPDATE', 'TEST_RUNTIME')
 with open(os.environ['TEST_LOG'], 'a') as log:
     log.write(json.dumps({'args': sys.argv[1:], 'env': {name: os.environ.get(name) for name in names}}) + '\\n')
+if sys.argv[1:] == ['fixture-child']:
+    import subprocess
+    sys.exit(subprocess.call(['node', '--version'], timeout=10))
 print('@salesforce/cli/2.0.0 linux-arm64 node-v24.20.0')
 """)
         self.system_bin = self.home / "test-system-bin"
@@ -67,7 +71,7 @@ print('@salesforce/cli/2.0.0 linux-arm64 node-v24.20.0')
         self.assertEqual([call["args"] for call in self.calls()], [["--version"]])
 
     def test_launcher_always_uses_file_keychain_without_telemetry(self):
-        for inherited in ({}, {"SF_USE_GENERIC_UNIX_KEYCHAIN": "false", "SF_DISABLE_TELEMETRY": "false"}):
+        for inherited in ({}, {"SF_USE_GENERIC_UNIX_KEYCHAIN": "false", "SF_DISABLE_TELEMETRY": "false", "SF_AUTOUPDATE_DISABLE": "false", "SF_DISABLE_AUTOUPDATE": "false"}):
             with self.subTest(inherited=inherited):
                 result = self.sf("org", "list", "--json", **inherited)
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -76,11 +80,36 @@ print('@salesforce/cli/2.0.0 linux-arm64 node-v24.20.0')
                 self.assertEqual(call["env"], {
                     "SF_USE_GENERIC_UNIX_KEYCHAIN": "true",
                     "SF_DISABLE_TELEMETRY": "true",
-                    "TEST_RUNTIME": "managed-node",
+                    "TEST_RUNTIME": "bundled-node",
+                    "SF_AUTOUPDATE_DISABLE": "true",
+                    "SF_DISABLE_AUTOUPDATE": "true",
                 })
 
+    def test_project_node_does_not_control_cli_or_child_path(self):
+        for selection in ('20.19.0', '22.16.0', 'missing'):
+            with self.subTest(selection=selection):
+                project = self.home / selection
+                project.mkdir()
+                (project / '.node-version').write_text(selection)
+                binary = project / 'bin'
+                binary.mkdir()
+                node = binary / 'node'
+                node.write_text('#!/bin/sh\n' + ('exit 42\n' if selection == 'missing' else f'echo {selection}\n'))
+                node.chmod(0o755)
+                env = {**self.environment, 'PATH': f'{binary}:{self.environment["PATH"]}'}
+                for args in (['--version'], ['org', 'list', '--target-org', 'name with spaces', '', '--json']):
+                    result = subprocess.run(['sf', *args], env=env, cwd=project,
+                                            capture_output=True, text=True, timeout=10)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(self.calls()[-1]['args'], args)
+                child = subprocess.run(['sf', 'fixture-child'], env=env, cwd=project,
+                                       capture_output=True, text=True, timeout=10)
+                self.assertEqual(child.returncode, 42 if selection == 'missing' else 0)
+                if selection != 'missing':
+                    self.assertEqual(child.stdout.strip(), selection)
+
     def test_launcher_propagates_cli_failure(self):
-        cli = self.home / CLI_DIR / "sf"
+        cli = self.home / CLI_DIR / "run.js"
         cli.write_text(cli.read_text() + "sys.exit(7)\n")
         self.assertEqual(self.sf("--version").returncode, 7)
 

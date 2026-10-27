@@ -7,9 +7,12 @@ set -euo pipefail
 export SF_USE_GENERIC_UNIX_KEYCHAIN=true
 export SF_DISABLE_TELEMETRY=true
 
-# Provisioning links the managed Node runtime beside the npm-installed CLI,
-# so a project's mise configuration cannot select another Node. Run the CLI
-# by absolute path so the launcher cannot recurse.
-readonly cli_dir="$HOME/.local/share/proteus/salesforce-cli"
-export PATH="${cli_dir}:${PATH}"
-exec "${cli_dir}/node" "${cli_dir}/sf" "$@"
+export SF_AUTOUPDATE_DISABLE=true
+export SF_DISABLE_AUTOUPDATE=true
+
+# Use the archive's bundled runtime directly. Its shell entry point can redirect
+# to a user-updated client or select a custom Node. Provisioning owns this client;
+# child commands keep the caller's project PATH.
+readonly cli_dir="$HOME/.local/share/proteus/salesforce-cli/current"
+export SF_BINPATH="$HOME/.local/bin/sf"
+exec "${cli_dir}/bin/node" --no-deprecation "${cli_dir}/bin/run.js" "$@"

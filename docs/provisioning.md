@@ -8,13 +8,41 @@ Provisioning applies the Development Baseline: the software and non-secret confi
 
 The Development Baseline includes command-line development tools, pinned language runtimes, Docker, GitHub CLI, Salesforce CLI, Teamwork Graph CLI, Neovim, Claude Code, OpenCode, T3 Code, and the Managed Dotfiles. Applications may download plugins or create caches and private state when first run after a rebuild.
 
-Each Provisioning run installs pnpm, OpenCode, T3 Code, and Salesforce CLI (`@salesforce/cli`) from their npm `latest` tags, upgrading existing installations when newer releases are available.
+Each Provisioning run installs pnpm, OpenCode, and T3 Code from their npm `latest` tags, upgrading existing installations when newer releases are available.
 
 Provisioning also reads the stable release version from Atlassian's [TWG installer](https://teamwork-graph.atlassian.com/cli/install), downloads the Linux ARM64 binary, and verifies it against the matching vendor SHA-256 manifest. It reads the installer's `DEFAULT_VERSION` selector without executing the installer. A changed selector format or missing release/checksum fails Provisioning rather than silently choosing another release. The binary lives at `~/.local/share/proteus/twg/twg`, linked through `~/.local/bin/twg` and `/usr/local/bin/twg` so interactive shells and background agents find the same CLI.
 
 Each run updates TWG and installs its official skills for the universal `~/.agents/skills` layout, Claude Code, and OpenCode. Managed Dotfiles add the shared `proteus-atlassian` skill in those locations: basic Jira/Confluence commands are the default, and Rovo-credit-consuming enriched operations require an explicit user request. This guidance is not an OAuth permission restriction. Provisioning installs `dbus-user-session` for TWG's Linux refresh helper but leaves authentication and upkeep activation to `./enroll twg`. Reprovisioning preserves credentials and the existing upkeep schedule; it does not start login or run the interactive TWG installer.
 
-Salesforce CLI runs through an `sf` launcher in the Managed Dotfiles, exposed through `/usr/local/bin/sf` so background services such as T3 can find it without shell startup files. The launcher runs the npm-installed CLI on the managed Node runtime with `SF_USE_GENERIC_UNIX_KEYCHAIN=true`, so credentials use Salesforce CLI's file-based keychain rather than a desktop keyring that background services cannot unlock, and `SF_DISABLE_TELEMETRY=true`, so the guest sends no usage data.
+Salesforce CLI runs through an `sf` launcher in the Managed Dotfiles, exposed through `/usr/local/bin/sf` so background services such as T3 can find it without shell startup files. The launcher runs the official standalone Linux ARM64 archive with its bundled Node runtime and `SF_USE_GENERIC_UNIX_KEYCHAIN=true`, so credentials use Salesforce CLI's file-based keychain rather than a desktop keyring that background services cannot unlock, and `SF_DISABLE_TELEMETRY=true`, so the guest sends no usage data.
+
+Salesforce CLI uses the official stable Linux ARM64 archive rather than npm. Both
+are supported by Salesforce; the archive includes Node and removes the npm-prefix
+lifecycle dependency without an advantage from retaining npm. On each explicit
+Provisioning run, Ansible resolves the current stable build manifest, verifies the
+archive's SHA-256 digest, extracts and checks the new release before activating
+it. A failed download, checksum, or runtime check leaves the prior active release
+available. Old standalone releases remain inactive under Proteus's tool directory.
+
+The Managed Dotfiles launcher invokes the bundled Node and `bin/run.js` directly,
+bypassing the vendor shell entry point's user-client redirection and custom Node
+selection. It does not prepend its runtime to PATH: project commands spawned by
+plugins retain the caller's project Node selection. Salesforce CLI can start even
+when that project Node is absent. The launcher forces `SF_AUTOUPDATE_DISABLE=true`
+and `SF_DISABLE_AUTOUPDATE=true`, as well as the keychain and telemetry settings,
+including when inherited values conflict. Explicit Provisioning owns updates.
+
+Migration uninstalls obsolete `@salesforce/cli` global packages (including `sf`
+and `sfdx` commands) only from direct mise Node installation prefixes, including
+retained older versions, and removes the previous Proteus-owned `sf` and `node`
+launcher links. It preserves Node installations, unrelated packages, project-local
+or custom prefixes, `.sf`, `.sfdx`, enrolled credentials, plugins, and user state.
+Provisioning never performs Salesforce Credential Enrollment; the configured login
+URL, `devhub` alias, and default Dev Hub workflow remain unchanged.
+
+Vendor references: [Salesforce CLI installation and archive manifests](https://developer.salesforce.com/docs/platform/sfdx-setup/guide/sfdx-setup-install-cli.html)
+and [disabling automatic updates](https://developer.salesforce.com/docs/platform/sfdx-setup/guide/sfdx-setup-disable-autoupdate.html).
+
 
 Claude Code uses Anthropic's official standalone Linux ARM64 executable, independently of
 mise Node installations and npm prefixes. Each explicit Provisioning reads the current
