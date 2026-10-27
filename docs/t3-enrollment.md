@@ -23,6 +23,12 @@ Credentials and T3 state stay in the guest. Browser approval does not require co
 
 ## Verified constraints
 
+Project Node selection for background agent commands, including the explicit
+entrypoint for services with an older runtime-first PATH, is described in
+[Node operations](./node-versions.md#background-commands-and-existing-t3-services).
+Provisioning exposes project commands without changing the enrolled service.
+Any persistent service PATH migration and restart remain explicit operations.
+
 The original integration was verified against T3 v0.0.45. Its [Connect onboarding](https://github.com/pingdotgg/t3code/blob/v0.0.45/apps/server/src/cli/connect.ts) can return successfully when relay-client installation is declined. [Service onboarding](https://github.com/pingdotgg/t3code/blob/v0.0.45/apps/server/src/cli/service.ts) also recovers service-installation errors and offers a manual server command. The wrapper therefore checks saved Connect configuration and systemd persistence after onboarding instead of relying on its exit code alone.
 
 `t3 connect status --json` reports persisted state. Its authentication and linking fields do not prove live credential validity or client connectivity. [The user documentation](https://github.com/pingdotgg/t3code/blob/main/docs/user/remote-access.md#t3-connect-troubleshooting) explicitly distinguishes this status from reachability.

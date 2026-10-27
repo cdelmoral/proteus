@@ -77,7 +77,7 @@ done
 printf "Preparing OpenCode migration and preservation checks in '%s'.\n" "$instance"
 limactl shell --tty=false --start=false "$instance" bash -s -- prepare < "$repository_root/tests/lima_opencode.sh"
 
-printf 'Checking interactive project Node selection in the disposable guest.\n'
+printf 'Checking interactive and systemd-background project Node selection in the disposable guest.\n'
 node_workspace="$(limactl shell --tty=false --start=false "$instance" mktemp -d /tmp/proteus-node-acceptance.XXXXXXXX)"
 limactl shell --tty=false --start=false "$instance" python3 - prepare "$node_workspace" \
   < "$repository_root/tests/lima_node_selection.py"

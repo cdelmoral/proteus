@@ -1,0 +1,13 @@
+#!/bin/sh
+# Use from the project directory. Resolve each command through mise's shims,
+# including commands after cd, without borrowing a parent tool's Node runtime.
+if [ "$#" -eq 0 ]; then
+  printf 'Usage: proteus-project-exec command [argument ...]\n' >&2
+  exit 2
+fi
+
+# pnpm lives in .local/bin once, rather than in every project Node prefix.
+# node/npm/npx there are managed links to mise shims, so this also takes
+# precedence over an inherited service's pinned runtime directory.
+export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
+exec "$@"

@@ -42,11 +42,42 @@ The check validates the production VM Definition, creates and starts a uniquely 
 
 Node assertions in `tests/lima_node_selection.py` use temporary repositories to exercise `.nvmrc`, `.node-version`, and `mise.toml`, interactive directory switching and default selection, explicit installation, missing-version failures without download, and pnpm build/test scripts with observed runtimes and failure propagation. They deliberately change the global default before the second Provisioning run.
 
+The Node runner also launches real transient systemd user services with an empty
+environment plus HOME and a minimal system PATH, without shell initialization.
+It checks node/npm across all declarations, concurrently running projects on
+different versions, missing node/npm/pnpm failure, OpenCode availability before
+recovery, and explicit `mise install node` from that background environment.
+A real baseline Node parent launches project pnpm build/test and npm commands
+through `proteus-project-exec` with a deliberately inherited baseline-first PATH;
+the parent retains its version while children use project Node. Argument and
+failure propagation are checked. Both Provisioning passes exercise these paths.
+The disposable guest must have a functioning systemd user manager; failure to
+launch a transient service fails acceptance rather than substituting a fixture.
+This requires no T3 enrollment and does not touch an existing T3 service.
+
 Claude, Salesforce, and OpenCode migration fixtures are seeded before Node assertions change the global default. The shared repeated run must migrate their obsolete npm installations and preserve each tool's user state, restore the pinned Node default, and retain usable additional project versions. No real Credential Enrollment is performed. Setup, assertions, Provisioning, and cleanup failures fail the command. This checks observable behavior rather than exact convergence of all Provisioning tasks.
 
 Focused Claude tests execute the actual Ansible tasks with a local HTTP vendor fixture and real npm migration across retained Node prefixes. They exercise upgrades, checksum/selector failures, user-state preservation, and child environment preservation. Enrollment subprocess tests confirm that login/status no longer require mise. These fixtures do not prove Linux ARM64 vendor compatibility or real authentication.
 
-Claude guest acceptance evidence: **unrun** on the Linux implementation host. Run `make lima-acceptance` on macOS and record the date, guest architecture, Claude version, and fresh/repeated outcomes before claiming guest acceptance. Real `./enroll claude` and subsequent authenticated status also remain manual, unrun checks requiring the owner's authorization; they are not part of the automated acceptance flow. Node guest acceptance is also **unrun** on this host. Noninteractive project Node resolution and an authenticated agent launching project builds belong to the other spec #50 tickets.
+Claude guest acceptance evidence: **unrun** on the Linux implementation host. Run `make lima-acceptance` on macOS and record the date, guest architecture, Claude version, and fresh/repeated outcomes before claiming guest acceptance. Real `./enroll claude` and subsequent authenticated status also remain manual, unrun checks requiring the owner's authorization; they are not part of the automated acceptance flow. Node guest acceptance is also **unrun** on this host.
+
+For #52, real authenticated T3 acceptance remains **unrun**. In the existing
+enrolled service, record the service PID/runtime and agent PATH before and after
+Provisioning without restarting it. From an agent run the two project versions
+concurrently, pnpm build/test, a missing-version failure followed by explicit
+installation, and a tool-parent/project-child command. Use the absolute
+`proteus-project-exec` entrypoint if the service has a private runtime first on
+PATH, as described in [Node operations](./node-versions.md). Record whether direct
+commands or the explicit entrypoint were used, actual versions, exit statuses,
+and unchanged service PID/runtime. Transient systemd services prove guest
+background behavior when run; they do not prove T3's provider subprocess
+environment. Local mise tests use fixture Node executables and prove neither.
+
+#52 local validation (2026-10-27, Linux ARM64): static checks passed; the bounded
+suite completed 132 tests with one npm-prerequisite skip, and that migration test
+passed separately with the existing npm runtime on PATH. All runs unset
+`T3CODE_HOME`. Six Node tests passed using pinned mise and isolated fixture
+executables. These results do not establish Lima or authenticated T3 acceptance.
 
 OpenCode migration is seeded before Node assertions change the global default.
 After the shared second Provisioning run, `tests/lima_opencode.sh` verifies the

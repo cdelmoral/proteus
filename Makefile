@@ -5,6 +5,7 @@ static:
 	ansible-playbook --syntax-check --inventory localhost, provisioning/playbook.yml
 	ansible-lint --profile safety provisioning
 	shellcheck configure enroll provision lib/config.sh dotfiles/home/.local/bin/gh dotfiles/home/.local/bin/proteus-capture-browser-url dotfiles/home/.local/bin/proteus-enroll-github dotfiles/home/.local/bin/proteus-enroll-twg dotfiles/home/.local/bin/proteus-git-credential-github dotfiles/home/.local/bin/sf dotfiles/home/.local/bin/opencode dotfiles/home/.local/lib/proteus/credentials.sh tests/lima_acceptance.sh tests/lima_opencode.sh
+	shellcheck dotfiles/home/.local/bin/proteus-project-exec
 	shellcheck --shell=bash dotfiles/home/.bashrc dotfiles/home/.local/lib/proteus/credentials.sh
 	limactl validate vm/proteus.yaml
 
