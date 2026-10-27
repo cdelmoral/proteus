@@ -117,6 +117,9 @@
     force: true
   loop: "{{ development_npm_packages }}"
 
+- name: Install standalone OpenCode and migrate the old npm installation
+  ansible.builtin.import_tasks: opencode.yml
+
 - name: Link the managed Node runtime for the Salesforce CLI launcher
   ansible.builtin.file:
     src: "{{ managed_node.stdout | trim }}/bin/node"

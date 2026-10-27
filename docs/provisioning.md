@@ -8,7 +8,30 @@ Provisioning applies the Development Baseline: the software and non-secret confi
 
 The Development Baseline includes command-line development tools, pinned language runtimes, Docker, GitHub CLI, Salesforce CLI, Teamwork Graph CLI, Neovim, Claude Code, OpenCode, T3 Code, and the Managed Dotfiles. Applications may download plugins or create caches and private state when first run after a rebuild.
 
-Each Provisioning run installs pnpm, Claude Code, OpenCode, T3 Code, and Salesforce CLI (`@salesforce/cli`) from their npm `latest` tags, upgrading existing installations when newer releases are available.
+Each Provisioning run installs pnpm, Claude Code, T3 Code, and Salesforce CLI (`@salesforce/cli`) from their npm `latest` tags, upgrading existing installations when newer releases are available.
+
+OpenCode uses the official `opencode-linux-arm64.tar.gz` glibc binary from the
+[current GitHub release](https://github.com/anomalyco/opencode/releases/latest),
+verified against the asset's SHA-256 digest returned by GitHub. Every explicit
+Provisioning run resolves the current release, verifies and launches the candidate,
+then installs it in `~/.local/share/proteus/opencode/opencode`. Failed downloads,
+digest verification, or candidate launches leave the previous installation intact.
+The Managed Dotfiles `opencode` launcher is exposed through `~/.local/bin` and
+`/usr/local/bin` for interactive shells and background agents. It sets the supported
+[`OPENCODE_DISABLE_AUTOUPDATE`](https://opencode.ai/docs/cli/#environment-variables)
+flag and preserves PATH, arguments, and exit status. OpenCode needs no development
+Node runtime; its project subprocesses inherit the project's environment.
+
+Migration removes only `opencode-ai` from the Provisioning-owned baseline Node
+prefix and command symlinks targeting that old installation. It does not invoke
+`opencode uninstall`, remove other Node installations, or touch OpenCode
+configuration, credentials, skills, sessions, caches, or history. An unrelated
+user command at the Managed Dotfiles destination is preserved and reported as a
+Stow conflict; resolve that conflict before retrying. Keep updates owned by
+`./provision`; avoid separate npm installs or `opencode upgrade`, which would
+introduce a competing installation path. The installation uses the same official
+Linux archive as the [vendor installer](https://opencode.ai/install), without
+executing that installer or changing shell startup files.
 
 Provisioning also reads the stable release version from Atlassian's [TWG installer](https://teamwork-graph.atlassian.com/cli/install), downloads the Linux ARM64 binary, and verifies it against the matching vendor SHA-256 manifest. It reads the installer's `DEFAULT_VERSION` selector without executing the installer. A changed selector format or missing release/checksum fails Provisioning rather than silently choosing another release. The binary lives at `~/.local/share/proteus/twg/twg`, linked through `~/.local/bin/twg` and `/usr/local/bin/twg` so interactive shells and background agents find the same CLI.
 

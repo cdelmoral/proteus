@@ -81,6 +81,7 @@
     force: true
   loop:
     - gh
+    - opencode
     - sf
     - twg
   become: true

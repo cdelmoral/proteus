@@ -14,6 +14,20 @@ T3 tests simulate systemd, lingering, and provider-independent Connect setup, in
 
 GitHub credential tests require Git, GitHub CLI, and OpenSSH. They exercise real credential lookup with dummy tokens and real signing with temporary keys, without network access. They cover background Git and `gh` commands, commit signing without a terminal or SSH agent, identity preservation, reprovisioning, credential rotation, invalid or encrypted keys, rejected tokens, missing references, and failed secret reads. Configure tests cover reference examples, preserving both defaults, upgrading token-only configuration, and interrupted input.
 
+OpenCode tests execute the real Ansible installation tasks against a local HTTP
+release feed and fixture archives. They verify digest and platform rejection,
+failed candidates preserving the old installation, migration, repeat runs and
+updates, unrelated command preservation, and untouched user state. A real launcher
+test verifies argument forwarding, failure propagation, the auto-update flag, and
+child command resolution through an unchanged project PATH. The vendor executable
+is simulated in these focused tests. They do not prove vendor ARM64 compatibility
+or real T3 execution. The Lima checks below exercise the real vendor distribution;
+a provider-authenticated OpenCode task spawning a project command through T3 is
+still part of spec #50's Node-selection acceptance.
+
+OpenCode #54 implementation validation ran on Linux. Real macOS/Lima acceptance
+remains **unrun**; do not interpret local fixture results as guest evidence.
+
 ## Manual acceptance
 
 Run the real macOS-to-Lima acceptance check manually:
@@ -22,7 +36,16 @@ Run the real macOS-to-Lima acceptance check manually:
 make lima-acceptance
 ```
 
-The check validates the production VM Definition, creates and starts a uniquely named `proteus-acceptance-*` VM, and invokes the production Provisioning command once. Fresh-VM Provisioning's exit status is the behavioral assertion. Setup or cleanup failures also fail the command. The check does not run Provisioning a second time or test exact convergence.
+The check validates the production VM Definition, creates and starts a uniquely named `proteus-acceptance-*` VM, and invokes the production Provisioning command. It then seeds the former real
+OpenCode npm installation and user-state sentinels, repeats production Provisioning,
+and runs `tests/lima_opencode.sh` inside the guest. Checks verify the installed
+vendor binary is ARM64 ELF, the obsolete baseline npm installation is gone, user
+configuration/credentials/skills/state survive byte for byte, and interactive and
+minimal background environments find the same OpenCode launcher. OpenCode must
+launch from a temporary project requesting an uninstalled Node version without
+installing it; a failing Node executable on the background PATH detects accidental
+runtime coupling. Setup, assertions, Provisioning, and cleanup failures all fail
+the command. This does not establish exact convergence of every development tool.
 
 The check refuses to adopt an existing instance and deletes the VM it created after success or failure. It disables development-port forwarding for that VM, so the normal `proteus` instance may remain running.
 

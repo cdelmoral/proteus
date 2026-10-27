@@ -65,4 +65,11 @@ limactl start --tty=false "$instance"
 printf "Running Provisioning against '%s'.\n" "$instance"
 "$provision_command" "$instance"
 
+printf "Preparing OpenCode migration and preservation checks in '%s'.\n" "$instance"
+limactl shell "$instance" bash -s -- prepare < "$repository_root/tests/lima_opencode.sh"
+
+printf "Repeating Provisioning against '%s'.\n" "$instance"
+"$provision_command" "$instance"
+limactl shell "$instance" bash -s -- check < "$repository_root/tests/lima_opencode.sh"
+
 printf "Disposable Lima acceptance passed for '%s'.\n" "$instance"
