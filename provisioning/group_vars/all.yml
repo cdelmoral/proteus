@@ -50,12 +50,14 @@ development_npm_packages:
     command: pnpm
   - package: opencode-ai
     command: opencode
-  - package: t3
-    command: t3
   # The Managed Dotfiles sf launcher runs this link with fixed settings.
   - package: "@salesforce/cli"
     command: sf
     link: "{{ salesforce_cli_dir }}/sf"
+
+t3_release_url: https://github.com/pingdotgg/t3code/releases/latest
+t3_distribution_url: https://github.com/pingdotgg/t3code/releases/download
+t3_install_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/t3"
 
 claude_distribution_url: https://downloads.claude.ai/claude-code-releases
 claude_install_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/claude"

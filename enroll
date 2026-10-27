@@ -137,7 +137,7 @@ if [[ "$tool" == t3 ]]; then
   # HOME must expand in the guest. The helper owns guest setup and verification.
   # shellcheck disable=SC2016
   if ! limactl shell --tty=false --start=false "$instance" sh -c \
-    'test -x "$HOME/.local/bin/t3" && test -x "$HOME/.local/bin/mise" && test -x "$HOME/.local/bin/proteus-enroll-t3" && command -v python3 >/dev/null'; then
+    'test -x "$HOME/.local/bin/t3" && test -x "$HOME/.local/bin/proteus-enroll-t3" && command -v python3 >/dev/null'; then
     printf "Lima instance '%s' has not been provisioned with T3 Enrollment. Run ./provision first.\n" "$instance" >&2
     exit 1
   fi

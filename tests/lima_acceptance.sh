@@ -65,15 +65,19 @@ limactl start --tty=false "$instance"
 printf "Running Provisioning against '%s'.\n" "$instance"
 "$provision_command" "$instance"
 
-# Keep Claude's assertions isolated so other tool tickets can extend this flow.
+# Exercise both standalone tools before explicit local service test setup.
 for phase in fresh prepare; do
-  limactl shell --tty=false --start=false "$instance" python3 - "$phase" \
-    < "$repository_root/tests/claude_guest_acceptance.py"
+  for tool in claude t3; do
+    limactl shell --tty=false --start=false "$instance" python3 - "$phase" \
+      < "$repository_root/tests/${tool}_guest_acceptance.py"
+  done
 done
 
-printf "Repeating Provisioning against '%s' to verify Claude migration and preservation.\n" "$instance"
+printf "Repeating Provisioning against '%s' to verify standalone tool migration and service preservation.\n" "$instance"
 "$provision_command" "$instance"
-limactl shell --tty=false --start=false "$instance" python3 - repeated \
-  < "$repository_root/tests/claude_guest_acceptance.py"
+for tool in claude t3; do
+  limactl shell --tty=false --start=false "$instance" python3 - repeated \
+    < "$repository_root/tests/${tool}_guest_acceptance.py"
+done
 
 printf "Disposable Lima acceptance passed for '%s'.\n" "$instance"

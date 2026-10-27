@@ -10,7 +10,7 @@ Teamwork Graph tests run the real enrollment helper and simulate TWG and lingeri
 
 Salesforce tests run the real launcher, enrollment helper, and URL-capture script in the guest home and simulate only the npm-installed Salesforce CLI, which opens its authorization URL through `BROWSER` as Salesforce CLI does. They cover login, browser-launch, and verification failures, repeat enrollment, and VM and terminal checks. Configuration tests drive `./configure` to save, keep, and reject Salesforce login URLs while preserving the GitHub references, and confirm the saved URL or the standard default reaches Salesforce CLI. Salesforce CLI tests run the managed `sf` launcher from the system PATH without shell startup and simulate only the npm-installed CLI, verifying its keychain and telemetry settings.
 
-T3 tests simulate systemd, lingering, and provider-independent Connect setup, including partial failures, retries, and existing-server protection. They verify completion from saved Connect configuration and systemd persistence, including links saved after startup and healthy services without private runtime metadata.
+T3 tests simulate systemd, lingering, and provider-independent Connect setup, including partial failures, retries, and existing-server protection. They verify completion from saved Connect configuration and systemd persistence, including links saved after startup and healthy services without private runtime metadata. Focused Provisioning tests execute the real Ansible tasks with local release archives/checksums and real npm migration across retained Node prefixes. They cover upgrades, invalid artifacts/selectors, preserved service files and credentials, direct enrollment without mise, and inherited project child PATH.
 
 GitHub credential tests require Git, GitHub CLI, and OpenSSH. They exercise real credential lookup with dummy tokens and real signing with temporary keys, without network access. They cover background Git and `gh` commands, commit signing without a terminal or SSH agent, identity preservation, reprovisioning, credential rotation, invalid or encrypted keys, rejected tokens, missing references, and failed secret reads. Configure tests cover reference examples, preserving both defaults, upgrading token-only configuration, and interrupted input.
 
@@ -26,6 +26,37 @@ The check validates the production VM Definition, creates and starts a uniquely 
 
 Focused Claude tests execute the actual Ansible tasks with a local HTTP vendor fixture and real npm migration across retained Node prefixes. They exercise upgrades, checksum/selector failures, user-state preservation, and child environment preservation. Enrollment subprocess tests confirm that login/status no longer require mise. These fixtures do not prove Linux ARM64 vendor compatibility or real authentication.
 
+T3 assertions in `tests/t3_guest_acceptance.py` check the real archive's ARM64
+executable, interactive/system-PATH invocation with blocked project Node, and
+unauthenticated Connect status. Explicit test setup then installs a real local
+systemd service bound to loopback, seeds dummy state and the obsolete npm link,
+and records process identity, runtime hashes, service unit, and configuration.
+Repeat production Provisioning must migrate npm while preserving those records.
+This service is **not Connect-enrolled**; automated acceptance never authorizes
+Connect or uses real credentials. Subprocesses and service readiness waits are
+bounded.
+
+T3 Linux ARM64 host artifact check (2026-10-27): **passed** using the actual
+Ansible task file against official `v0.1.3` release endpoints, an isolated home,
+and redirected command links. Checksum verification, full extraction, ELF ARM64
+identification, `--version`, and preservation of seeded service/state files passed.
+The first attempts in RAM-backed `/tmp` timed out under severe memory pressure;
+using disk-backed temporary storage resolved that resource constraint. This did
+not install a real service or perform Connect enrollment.
+
+T3 guest acceptance evidence: **unrun** on the Linux implementation host.
+Run `make lima-acceptance` on macOS and record date, guest architecture, CLI and
+service versions, and fresh/repeated outcomes. Separately, on an owner-authorized
+Connect-enrolled guest, record `systemctl --user show t3code.service` process
+identity/start time, active/enabled state, service runtime selection and hashes,
+and hashes of credentials/configuration before and after `./provision`. Confirm
+these remain unchanged and an existing remote connection continues working,
+including when the service version differs from the CLI. Do not print credential
+contents in the evidence. That enrolled-service case, real Connect onboarding and
+retry, logout/reboot persistence, and background agent project Node resolution
+remain **unrun** here; fixtures and the unauthenticated local service do not prove
+them. The latter Node-resolution checks belong to the other spec #50 tickets.
+
 Claude guest acceptance evidence: **unrun** on the Linux implementation host. Run `make lima-acceptance` on macOS and record the date, guest architecture, Claude version, and fresh/repeated outcomes before claiming guest acceptance. Real `./enroll claude` and subsequent authenticated status also remain manual, unrun checks requiring the owner's authorization; they are not part of the automated acceptance flow. Project Node resolution and an authenticated agent launching project builds belong to the other spec #50 tickets.
 
 The check refuses to adopt an existing instance and deletes the VM it created after success or failure. It disables development-port forwarding for that VM, so the normal `proteus` instance may remain running.
@@ -38,7 +69,7 @@ For Teamwork Graph, run `./enroll twg`, authorize your personal account through 
 
 For T3, run `./enroll t3` on a fresh provisioned VM from an interactive macOS terminal. Accept relay-client and service installation, approve the browser code, and confirm local verification completes. Sign in to the same T3 Connect account from another device and connect to the environment. Close the guest shell, then stop/start the VM; confirm the service and remote access return without running enrollment again. Authenticate a provider separately to run agent work.
 
-Repeat T3 enrollment and confirm it leaves the running service untouched. Verify that a service on a different version from the npm CLI still passes when healthy. Decline or interrupt setup, confirm incomplete setup is reported, and retry using the saved authorization. Start a foreground server and confirm enrollment refuses takeover. For a running service started before Connect was enabled, confirm enrollment saves authorization and environment linking without restarting it or rejecting the new link's timestamp. Verify remote access from another device; if activation needs a restart, perform it explicitly when ready. After deleting the VM, deregister its old cloud environment and enroll the replacement afresh.
+Repeat T3 enrollment and confirm it leaves the running service untouched. Verify that a service on a different version from the standalone CLI still passes when healthy. Decline or interrupt setup, confirm incomplete setup is reported, and retry using the saved authorization. Start a foreground server and confirm enrollment refuses takeover. For a running service started before Connect was enabled, confirm enrollment saves authorization and environment linking without restarting it or rejecting the new link's timestamp. Verify remote access from another device; if activation needs a restart, perform it explicitly when ready. After deleting the VM, deregister its old cloud environment and enroll the replacement afresh.
 
 For Salesforce, run `./configure` with your org's login URL, then run `./enroll salesforce` on a fresh provisioned VM from an interactive macOS terminal. Open the printed URL in the macOS browser, log in as the Dev Hub User, approve access, and confirm enrollment reports success. Inside the guest, create a scratch org, run a command against it, and open it with `sf org open --url-only`. Run `sf org list` through T3's background service. Stop and start the VM and confirm the authorization persists, then re-enroll. After a rebuild, follow the scratch org deletion and OAuth revocation steps for the old VM and enroll the replacement.
 
