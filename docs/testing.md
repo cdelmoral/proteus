@@ -16,6 +16,20 @@ GitHub credential tests require Git, GitHub CLI, and OpenSSH. They exercise real
 
 The focused Node tests execute pinned mise against temporary homes and isolated fixture executables, without downloading Node or touching the user's mise configuration. Run them with `PROTEUS_TEST_MISE=/absolute/path/to/mise-2026.9.1 python3 -m unittest discover -s tests -p test_node_selection.py`. Without this variable they skip; these fixtures verify mise selection and missing-version behavior, while real Node/pnpm integration belongs to Lima acceptance.
 
+OpenCode tests execute the real Ansible installation tasks against a local HTTP
+release feed and fixture archives. They verify digest and platform rejection,
+failed candidates preserving the old installation, migration, repeat runs and
+updates, unrelated command preservation, and untouched user state. A real launcher
+test verifies argument forwarding, failure propagation, the auto-update flag, and
+child command resolution through an unchanged project PATH. The vendor executable
+is simulated in these focused tests. They do not prove vendor ARM64 compatibility
+or real T3 execution. The Lima checks below exercise the real vendor distribution;
+a provider-authenticated OpenCode task spawning a project command through T3 is
+still part of spec #50's Node-selection acceptance.
+
+OpenCode #54 implementation validation ran on Linux. Real macOS/Lima acceptance
+remains **unrun**; do not interpret local fixture results as guest evidence.
+
 ## Manual acceptance
 
 Run the real macOS-to-Lima acceptance check manually:
@@ -33,6 +47,15 @@ The repeated run must migrate Claude's obsolete npm installation and preserve it
 Focused Claude tests execute the actual Ansible tasks with a local HTTP vendor fixture and real npm migration across retained Node prefixes. They exercise upgrades, checksum/selector failures, user-state preservation, and child environment preservation. Enrollment subprocess tests confirm that login/status no longer require mise. These fixtures do not prove Linux ARM64 vendor compatibility or real authentication.
 
 Claude guest acceptance evidence: **unrun** on the Linux implementation host. Run `make lima-acceptance` on macOS and record the date, guest architecture, Claude version, and fresh/repeated outcomes before claiming guest acceptance. Real `./enroll claude` and subsequent authenticated status also remain manual, unrun checks requiring the owner's authorization; they are not part of the automated acceptance flow. Node guest acceptance is also **unrun** on this host. Noninteractive project Node resolution and an authenticated agent launching project builds belong to the other spec #50 tickets.
+
+OpenCode migration is seeded before Node assertions change the global default.
+After the shared second Provisioning run, `tests/lima_opencode.sh` verifies the
+installed vendor binary is ARM64 ELF, the obsolete baseline npm installation is
+gone, user configuration/credentials/skills/state survive byte for byte, and
+interactive and minimal background environments find the same OpenCode launcher.
+OpenCode must launch from a temporary project requesting an uninstalled Node
+version without installing it; a failing Node executable on the background PATH
+detects accidental runtime coupling.
 
 The check refuses to adopt an existing instance and deletes the VM it created after success or failure. It disables development-port forwarding for that VM, so the normal `proteus` instance may remain running.
 

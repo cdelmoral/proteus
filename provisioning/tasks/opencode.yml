@@ -1,0 +1,101 @@
+---
+- name: Require the supported OpenCode guest platform
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.system == 'Linux'
+      - ansible_facts.architecture == 'aarch64'
+    fail_msg: OpenCode requires the Linux ARM64 guest.
+
+- name: Read the current official OpenCode release
+  ansible.builtin.uri:
+    url: "{{ opencode_release_url }}"
+    return_content: true
+  register: opencode_release
+
+- name: Select the official Linux ARM64 archive
+  ansible.builtin.set_fact:
+    opencode_asset: >-
+      {{ opencode_release.json.assets | selectattr('name', 'equalto', 'opencode-linux-arm64.tar.gz') | first }}
+
+- name: Require a vendor SHA-256 digest
+  ansible.builtin.assert:
+    that:
+      - opencode_asset.digest is match('^sha256:[0-9a-f]{64}$')
+    fail_msg: The OpenCode release must provide a SHA-256 digest for the Linux ARM64 archive.
+
+- name: Create the OpenCode installation directory
+  ansible.builtin.file:
+    path: "{{ opencode_install_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Stage the OpenCode release
+  ansible.builtin.tempfile:
+    state: directory
+    prefix: proteus-opencode-
+  register: opencode_staging
+
+- name: Verify and install OpenCode before removing the old installation
+  block:
+    - name: Download the verified OpenCode archive
+      ansible.builtin.get_url:
+        url: "{{ opencode_asset.browser_download_url }}"
+        dest: "{{ opencode_staging.path }}/opencode.tar.gz"
+        checksum: "{{ opencode_asset.digest }}"
+        mode: "0644"
+
+    - name: Extract the official OpenCode binary
+      ansible.builtin.unarchive:
+        src: "{{ opencode_staging.path }}/opencode.tar.gz"
+        dest: "{{ opencode_staging.path }}"
+        remote_src: true
+
+    - name: Verify the candidate OpenCode launches
+      ansible.builtin.command:
+        argv:
+          - "{{ opencode_staging.path }}/opencode"
+          - --version
+      environment: >-
+        {{ managed_user_environment | combine({'OPENCODE_DISABLE_AUTOUPDATE': 'true'}) }}
+      changed_when: false
+
+    - name: Install the standalone OpenCode binary
+      ansible.builtin.copy:
+        src: "{{ opencode_staging.path }}/opencode"
+        dest: "{{ opencode_install_dir }}/opencode"
+        remote_src: true
+        mode: "0755"
+  always:
+    - name: Remove the OpenCode staging directory
+      ansible.builtin.file:
+        path: "{{ opencode_staging.path }}"
+        state: absent
+
+# Only the old Provisioning-owned baseline prefix is eligible for cleanup.
+# Never run the vendor uninstaller: it can remove application state.
+- name: Inspect obsolete OpenCode command links
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+  loop:
+    - "{{ managed_node.stdout | trim }}/bin/opencode"
+    - "{{ ansible_facts.user_dir }}/.local/bin/opencode"
+  register: opencode_old_links
+
+- name: Remove only links to the obsolete managed npm installation
+  ansible.builtin.file:
+    path: "{{ item.item }}"
+    state: absent
+  loop: "{{ opencode_old_links.results }}"
+  when:
+    - item.stat.islnk | default(false)
+    - >-
+      item.stat.lnk_source in [
+        (managed_node.stdout | trim) ~ '/bin/opencode',
+        (managed_node.stdout | trim) ~ '/lib/node_modules/opencode-ai/bin/opencode'
+      ]
+
+- name: Remove the obsolete baseline OpenCode npm package
+  ansible.builtin.file:
+    path: "{{ managed_node.stdout | trim }}/lib/node_modules/opencode-ai"
+    state: absent

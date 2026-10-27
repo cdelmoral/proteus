@@ -48,3 +48,9 @@ Mise references: [Node declarations](https://mise.jdx.dev/lang/node.html),
 [settings for pinned mise 2026.9.1](https://github.com/jdx/mise/blob/v2026.9.1/settings.toml)
 (`auto_install`, `not_found_auto_install`, `not_found_system_fallback`, and
 `idiomatic_version_file_enable_tools`).
+
+OpenCode is installed from the official Linux ARM64 binary, independently of
+mise's Node installations. It launches even when a project's requested Node is
+missing. Its launcher disables independent auto-updates without changing PATH,
+so project subprocesses retain the caller's Node selection. Run `./provision`
+to update OpenCode; see [Provisioning](./provisioning.md) for migration details.

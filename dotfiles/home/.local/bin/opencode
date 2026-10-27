@@ -1,0 +1,4 @@
+#!/bin/sh
+# Provisioning owns updates. Leave PATH intact for project subprocesses.
+export OPENCODE_DISABLE_AUTOUPDATE=true
+exec "$HOME/.local/share/proteus/opencode/opencode" "$@"

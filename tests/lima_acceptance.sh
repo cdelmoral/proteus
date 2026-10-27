@@ -72,16 +72,20 @@ for phase in fresh prepare; do
     < "$repository_root/tests/claude_guest_acceptance.py"
 done
 
+printf "Preparing OpenCode migration and preservation checks in '%s'.\n" "$instance"
+limactl shell --tty=false --start=false "$instance" bash -s -- prepare < "$repository_root/tests/lima_opencode.sh"
+
 printf 'Checking interactive project Node selection in the disposable guest.\n'
 node_workspace="$(limactl shell --tty=false --start=false "$instance" mktemp -d /tmp/proteus-node-acceptance.XXXXXXXX)"
 limactl shell --tty=false --start=false "$instance" python3 - prepare "$node_workspace" \
   < "$repository_root/tests/lima_node_selection.py"
 
-printf "Repeating Provisioning against '%s' to verify Claude migration, user state, and Node restoration.\n" "$instance"
+printf "Repeating Provisioning against '%s' to verify Claude/OpenCode migration, user state, and Node restoration.\n" "$instance"
 "$provision_command" "$instance"
 limactl shell --tty=false --start=false "$instance" python3 - repeated \
   < "$repository_root/tests/claude_guest_acceptance.py"
 limactl shell --tty=false --start=false "$instance" python3 - verify "$node_workspace" \
   < "$repository_root/tests/lima_node_selection.py"
+limactl shell --tty=false --start=false "$instance" bash -s -- check < "$repository_root/tests/lima_opencode.sh"
 
 printf "Disposable Lima acceptance passed for '%s'.\n" "$instance"
