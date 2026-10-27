@@ -8,6 +8,77 @@ import sys
 phase, workspace = sys.argv[1:]
 root = Path(workspace)
 mise = str(Path.home() / '.local/bin/mise')
+background_path = '/usr/local/bin:/usr/bin:/bin'
+
+
+def background_command(directory, *args, path=background_path):
+    # A real transient user service: no SSH/session PATH or shell startup files.
+    # This needs the guest user manager, but never installs/restarts T3.
+    return ['systemd-run', '--user', '--wait', '--pipe', '--collect', '--quiet',
+            '--property=WorkingDirectory=' + str(directory),
+            '/usr/bin/env', '-i', 'HOME=' + str(Path.home()), 'PATH=' + path,
+            *args]
+
+
+def background(directory, *args, expected=0, path=background_path):
+    return run(*background_command(directory, *args, path=path), expected=expected)
+
+
+def background_assertions(baseline):
+    projects = [(root, baseline), (root / 'nvmrc', '22.14.0'),
+                (root / 'node-version', '22.14.0'), (root / 'mise', '22.14.0'),
+                (root / 'missing', '20.19.0')]
+    for directory, selected in projects:
+        assert background(directory, 'node', '-p', 'process.version') == 'v' + selected
+        assert background(directory, 'npm', 'exec', '--offline', '--',
+                          'node', '-p', 'process.version') == 'v' + selected
+    # Launch both services before waiting: distinct working directories and Node
+    # versions must coexist, and global selection must remain unchanged.
+    children = [(subprocess.Popen(background_command(directory, 'node', '-e',
+                 'setTimeout(() => console.log(process.version), 500)'),
+                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True), selected)
+                for directory, selected in [projects[1], projects[-1]]]
+    for child, selected in children:
+        stdout, stderr = child.communicate(timeout=30)
+        assert child.returncode == 0, stderr
+        assert stdout.strip() == 'v' + selected, stdout
+    assert run(mise, 'config', 'get', '--global', 'tools.node').strip('"') == baseline
+    observed = background(root, 'sh', '-c',
+                          'node -p process.version; cd "$1"; node -p process.version',
+                          'sh', str(root / 'nvmrc'))
+    assert observed.splitlines() == ['v' + baseline, 'v22.14.0'], observed
+
+    # A real Node parent on the baseline remains on that runtime. Its child
+    # starts with a deliberately contaminated service PATH, then uses the
+    # explicit project entrypoint; pnpm scripts must run on the project Node.
+    parent = root / 'parent.cjs'
+    parent.write_text('''
+const assert = require('node:assert/strict');
+const {spawnSync} = require('node:child_process');
+const [directory, baseline] = process.argv.slice(2);
+assert.equal(process.version, 'v' + baseline);
+for (const args of [['pnpm', 'run', 'build'], ['pnpm', 'test'],
+                    ['npm', 'exec', '--offline', '--', 'node', '-p', 'process.version']]) {
+  const result = spawnSync('/usr/local/bin/proteus-project-exec', args,
+                           {cwd: directory, env: process.env, encoding: 'utf8'});
+  assert.equal(result.status, 0, result.stderr);
+  if (args[0] === 'npm') assert.equal(result.stdout.trim(), 'v22.14.0');
+}
+const failure = spawnSync('/usr/local/bin/proteus-project-exec',
+                          ['pnpm', 'run', 'failure'], {cwd: directory, env: process.env});
+assert.equal(failure.status, 7);
+const argument = 'argument with spaces; $literal';
+const forwarded = spawnSync('/usr/local/bin/proteus-project-exec',
+  ['node', '-e', 'console.log(process.argv[1])', argument],
+  {cwd: directory, env: process.env, encoding: 'utf8'});
+assert.equal(forwarded.status, 0, forwarded.stderr);
+assert.equal(forwarded.stdout.trim(), argument);
+assert.equal(process.version, 'v' + baseline);
+console.log('parent/child passed');
+''')
+    baseline_bin = run(mise, 'where', 'node@' + baseline) + '/bin'
+    assert background(root, baseline_bin + '/node', str(parent), str(root / 'nvmrc'), baseline,
+                      path=baseline_bin + ':' + background_path) == 'parent/child passed'
 
 
 def run(*args, cwd=root, expected=0):
@@ -70,10 +141,32 @@ if phase == 'prepare':
     result = subprocess.run([mise, 'where', 'node@20.19.0'], cwd=root,
                             capture_output=True, timeout=30)
     assert result.returncode != 0, 'Execution implicitly installed Node'
-    run(mise, 'install', cwd=missing)
+    # Native Proteus tools must be usable to prepare this missing-runtime
+    # project. No authentication or provider task is required for --version.
+    background(missing, '/usr/local/bin/opencode', '--version')
+    for command in [('node', '-v'), ('npm', '--version'), ('pnpm', '--version'),
+                    ('proteus-project-exec', 'node', '-v')]:
+        result = subprocess.run(background_command(missing, *command),
+                                text=True, capture_output=True, timeout=30)
+        assert result.returncode != 0, (command, result.stdout)
+        assert 'mise install' in result.stderr, (command, result.stderr)
+    assert subprocess.run([mise, 'where', 'node@20.19.0'], cwd=root,
+                          capture_output=True, timeout=30).returncode != 0
+    # Agent recovery uses the very same explicit install operation as a human.
+    baseline_bin = run(mise, 'where', 'node@' + baseline) + '/bin'
+    for command in ['node', 'npm', 'pnpm']:
+        result = subprocess.run(background_command(
+            missing, '/usr/local/bin/proteus-project-exec', command, '--version',
+            path=baseline_bin + ':' + background_path),
+            text=True, capture_output=True, timeout=30)
+        assert result.returncode != 0, (command, result.stdout)
+        assert 'mise install' in result.stderr, (command, result.stderr)
+    background(missing, '/usr/local/bin/proteus-project-exec', mise, 'install', 'node',
+               path=baseline_bin + ':' + background_path)
     version(missing, '20.19.0')
     version(root / 'nvmrc', '22.14.0')
     version(root, baseline)
+    background_assertions(baseline)
     # Deliberately drift the global selection; repeated Provisioning restores it.
     run(mise, 'use', '--global', '--pin', 'node@22.14.0')
 elif phase == 'verify':
@@ -81,6 +174,7 @@ elif phase == 'verify':
     version(root, baseline)
     version(root / 'nvmrc', '22.14.0')
     version(root / 'missing', '20.19.0')
+    background_assertions(baseline)
 else:
     raise AssertionError(phase)
 print('Node selection acceptance passed:', phase)
