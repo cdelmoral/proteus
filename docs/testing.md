@@ -14,6 +14,8 @@ T3 tests simulate systemd, lingering, and provider-independent Connect setup, in
 
 GitHub credential tests require Git, GitHub CLI, and OpenSSH. They exercise real credential lookup with dummy tokens and real signing with temporary keys, without network access. They cover background Git and `gh` commands, commit signing without a terminal or SSH agent, identity preservation, reprovisioning, credential rotation, invalid or encrypted keys, rejected tokens, missing references, and failed secret reads. Configure tests cover reference examples, preserving both defaults, upgrading token-only configuration, and interrupted input.
 
+The focused Node tests execute pinned mise against temporary homes and isolated fixture executables, without downloading Node or touching the user's mise configuration. Run them with `PROTEUS_TEST_MISE=/absolute/path/to/mise-2026.9.1 python3 -m unittest discover -s tests -p test_node_selection.py`. Without this variable they skip; these fixtures verify mise selection and missing-version behavior, while real Node/pnpm integration belongs to Lima acceptance.
+
 ## Manual acceptance
 
 Run the real macOS-to-Lima acceptance check manually:
@@ -22,7 +24,7 @@ Run the real macOS-to-Lima acceptance check manually:
 make lima-acceptance
 ```
 
-The check validates the production VM Definition, creates and starts a uniquely named `proteus-acceptance-*` VM, and invokes the production Provisioning command once. Fresh-VM Provisioning's exit status is the behavioral assertion. Setup or cleanup failures also fail the command. The check does not run Provisioning a second time or test exact convergence.
+The check validates the production VM Definition, creates and starts a uniquely named `proteus-acceptance-*` VM, and invokes production Provisioning. It then runs `lima_node_selection.py` inside the guest: temporary repositories exercise `.nvmrc`, `.node-version`, and `mise.toml`, interactive directory switching and default selection, explicit installation, missing-version failures without download, and pnpm build/test scripts with observed runtimes and failure propagation. It deliberately changes the global default, repeats Provisioning, and verifies the pinned default returns while additional installed versions remain usable. Setup, assertions, Provisioning, and cleanup failures fail the command. This does not assert exact convergence of all tools.
 
 The check refuses to adopt an existing instance and deletes the VM it created after success or failure. It disables development-port forwarding for that VM, so the normal `proteus` instance may remain running.
 
@@ -89,4 +91,4 @@ Use the [setup, replacement and rebuild guide](./aws-setup.md) and
 [AWS Credential Enrollment guide](./aws-enrollment.md) as the operating steps.
 Record actual outcomes and dates here when acceptance is performed; do not mark
 these rows passed from automated fixtures. `make lima-acceptance` checks baseline
-Provisioning only and does not run this AWS matrix.
+Provisioning and project Node selection; it does not run this AWS matrix.

@@ -10,6 +10,7 @@ readonly generated_suffix
 readonly instance="${PROTEUS_ACCEPTANCE_INSTANCE:-proteus-acceptance-${generated_suffix}}"
 
 created=false
+node_workspace=""
 
 cleanup() {
   local exit_status=$?
@@ -64,5 +65,13 @@ limactl start --tty=false "$instance"
 
 printf "Running Provisioning against '%s'.\n" "$instance"
 "$provision_command" "$instance"
+
+printf 'Checking interactive project Node selection in the disposable guest.\n'
+node_workspace="$(limactl shell "$instance" mktemp -d /tmp/proteus-node-acceptance.XXXXXXXX)"
+limactl shell "$instance" python3 - prepare "$node_workspace" < "$repository_root/tests/lima_node_selection.py"
+
+printf 'Repeating Provisioning to check default restoration and retained project versions.\n'
+"$provision_command" "$instance"
+limactl shell "$instance" python3 - verify "$node_workspace" < "$repository_root/tests/lima_node_selection.py"
 
 printf "Disposable Lima acceptance passed for '%s'.\n" "$instance"
