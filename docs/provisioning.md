@@ -8,7 +8,7 @@ Provisioning applies the Development Baseline: the software and non-secret confi
 
 The Development Baseline includes command-line development tools, pinned language runtimes, Docker, GitHub CLI, Salesforce CLI, Teamwork Graph CLI, Neovim, Claude Code, OpenCode, T3 Code, and the Managed Dotfiles. Applications may download plugins or create caches and private state when first run after a rebuild.
 
-Each Provisioning run installs pnpm, Claude Code, OpenCode, T3 Code, and Salesforce CLI (`@salesforce/cli`) from their npm `latest` tags, upgrading existing installations when newer releases are available.
+Each Provisioning run installs pnpm, OpenCode, T3 Code, and Salesforce CLI (`@salesforce/cli`) from their npm `latest` tags, upgrading existing installations when newer releases are available.
 
 Provisioning also reads the stable release version from Atlassian's [TWG installer](https://teamwork-graph.atlassian.com/cli/install), downloads the Linux ARM64 binary, and verifies it against the matching vendor SHA-256 manifest. It reads the installer's `DEFAULT_VERSION` selector without executing the installer. A changed selector format or missing release/checksum fails Provisioning rather than silently choosing another release. The binary lives at `~/.local/share/proteus/twg/twg`, linked through `~/.local/bin/twg` and `/usr/local/bin/twg` so interactive shells and background agents find the same CLI.
 
@@ -16,9 +16,39 @@ Each run updates TWG and installs its official skills for the universal `~/.agen
 
 Salesforce CLI runs through an `sf` launcher in the Managed Dotfiles, exposed through `/usr/local/bin/sf` so background services such as T3 can find it without shell startup files. The launcher runs the npm-installed CLI on the managed Node runtime with `SF_USE_GENERIC_UNIX_KEYCHAIN=true`, so credentials use Salesforce CLI's file-based keychain rather than a desktop keyring that background services cannot unlock, and `SF_DISABLE_TELEMETRY=true`, so the guest sends no usage data.
 
+Claude Code uses Anthropic's official standalone Linux ARM64 executable, independently of
+mise Node installations and npm prefixes. Each explicit Provisioning reads the current
+`latest` release and its `manifest.json` from
+`https://downloads.claude.ai/claude-code-releases`, verifies the executable's SHA-256
+against the manifest, and checks `--version` before replacing the command links.
+The executable lives in `~/.local/share/proteus/claude/<version>/claude`;
+`~/.local/bin/claude` and `/usr/local/bin/claude` select the same executable for
+interactive shells, Credential Enrollment, and background services. It does not
+resolve project Node or rewrite the child-command environment.
+
+Migration uninstalls only `@anthropic-ai/claude-code` from retained mise Node
+prefixes (including earlier Development Baselines), using each prefix's own npm
+and Node. It replaces the obsolete command link without removing `~/.claude/`,
+`~/.claude.json`, settings, history, credentials, or other npm packages. An npm
+installation may already contain a native executable; this migration removes its
+installation lifecycle coupling to Node rather than claiming it needs Node to run.
+Installations outside the Provisioning-owned mise prefixes are left to the user.
+Old standalone version directories are retained so a running executable is not
+removed; they are versions of the same installation method.
+
+Provisioning owns Claude Code updates. Managed settings set
+`env.DISABLE_AUTOUPDATER=1`, disabling independent background updates for all
+projects. Manual `claude update`/`claude install` remain vendor-supported overrides
+and can introduce a competing native installation; use `./provision` for updates
+and avoid those commands on Proteus. The distribution layout and update control
+follow Anthropic's [installation and update documentation](https://code.claude.com/docs/en/setup)
+and [official installer](https://claude.ai/install.sh). The checksum is obtained
+via HTTPS from the vendor manifest, as in the installer; these tasks do not verify
+the manifest's detached GPG signature.
+
 Provisioning also registers the official Claude Code plugin marketplace and runs `claude plugin install mattpocock-skills@claude-plugins-official` as the guest user. The skills are installed at user scope for all projects. Installing this public plugin does not require Claude Code sign-in; run `./enroll claude` when you start using Claude Code.
 
-Provisioning installs `/etc/claude-code/managed-settings.json`, which disables Claude Code's commit `Co-Authored-By` trailer and pull request footer. Managed settings take precedence over user and project settings, so attribution cannot be re-enabled per project; edit the Provisioning task to change it.
+Provisioning installs `/etc/claude-code/managed-settings.json`, which disables independent background updates, Claude Code's commit `Co-Authored-By` trailer and pull request footer. Managed settings take precedence over user and project settings, so attribution cannot be re-enabled per project; edit the Provisioning task to change it.
 
 A rebuild does not restore VM-Local Credentials, Host-Injected Credentials, project repositories, uncommitted work, command history, caches, application state, or workspace state. Back up or publish work that must survive before deleting Proteus. Credential Enrollment and repository cloning happen again in the new guest.
 

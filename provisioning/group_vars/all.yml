@@ -48,8 +48,6 @@ development_tool_packages:
 development_npm_packages:
   - package: pnpm
     command: pnpm
-  - package: "@anthropic-ai/claude-code"
-    command: claude
   - package: opencode-ai
     command: opencode
   - package: t3
@@ -58,6 +56,9 @@ development_npm_packages:
   - package: "@salesforce/cli"
     command: sf
     link: "{{ salesforce_cli_dir }}/sf"
+
+claude_distribution_url: https://downloads.claude.ai/claude-code-releases
+claude_install_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/claude"
 
 salesforce_cli_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/salesforce-cli"
 

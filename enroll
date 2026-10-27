@@ -182,10 +182,10 @@ if [[ "$tool" == salesforce ]]; then
 fi
 
 if [[ "$tool" == claude ]]; then
-  # HOME must expand in the guest. mise supplies the managed Node runtime.
+  # HOME must expand in the guest. Claude is a standalone native executable.
   # shellcheck disable=SC2016
   if ! limactl shell --tty=false --start=false "$instance" sh -c \
-    'test -x "$HOME/.local/bin/claude" && test -x "$HOME/.local/bin/mise"' >/dev/null 2>&1; then
+    'test -x "$HOME/.local/bin/claude"' >/dev/null 2>&1; then
     printf "Lima instance '%s' has not been provisioned with Claude Code. Run ./provision first.\n" "$instance" >&2
     exit 1
   fi
@@ -194,14 +194,14 @@ if [[ "$tool" == claude ]]; then
 
   # shellcheck disable=SC2016
   if ! limactl shell --tty=true --start=false "$instance" sh -c \
-    'exec "$HOME/.local/bin/mise" exec -- "$HOME/.local/bin/claude" auth login'; then
+    'exec "$HOME/.local/bin/claude" auth login'; then
     printf "Claude Code Credential Enrollment failed for Lima instance '%s'.\n" "$instance" >&2
     exit 1
   fi
 
   # shellcheck disable=SC2016
   if ! limactl shell --tty=false --start=false "$instance" sh -c \
-    'exec "$HOME/.local/bin/mise" exec -- "$HOME/.local/bin/claude" auth status' >/dev/null 2>&1; then
+    'exec "$HOME/.local/bin/claude" auth status' >/dev/null 2>&1; then
     printf "Claude Code could not confirm authentication in Lima instance '%s'.\n" "$instance" >&2
     exit 1
   fi
