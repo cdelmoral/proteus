@@ -81,6 +81,60 @@
     force: true
   loop:
     - gh
+    - opencode
     - sf
     - twg
+    - pnpm
+    - proteus-project-exec
+  become: true
+
+# Shell activation is not run by systemd or agent subprocesses. Generate the
+# same mise shims used interactively, then expose only the project entrypoints.
+- name: Refresh mise shims for background project commands
+  ansible.builtin.command:
+    argv:
+      - "{{ mise_binary }}"
+      - reshim
+  environment: "{{ managed_user_environment }}"
+  changed_when: true
+
+- name: Expose project Node commands through mise shims
+  ansible.builtin.file:
+    src: "{{ ansible_facts.user_dir }}/.local/share/mise/shims/{{ item.1 }}"
+    dest: "{{ item.0 }}/{{ item.1 }}"
+    state: link
+    force: true
+  loop: "{{ [ansible_facts.user_dir ~ '/.local/bin', '/usr/local/bin'] | product(['node', 'npm', 'npx']) | list }}"
+  become: true
+
+# System defaults apply even to T3's shadow CODEX_HOME. A higher-priority user,
+# project or T3 launch override is intentional configuration, checked in acceptance.
+- name: Create the Codex system configuration directory
+  ansible.builtin.file:
+    path: /etc/codex
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Configure Codex project command environments
+  ansible.builtin.blockinfile:
+    path: /etc/codex/config.toml
+    create: true
+    mode: "0644"
+    validate: /usr/bin/python3 -c 'import sys,tomllib; tomllib.load(open(sys.argv[1], "rb"))' %s
+    marker: "# {mark} Proteus project commands"
+    block: "{{ lookup('ansible.builtin.template', proteus_dotfiles_source ~ '/system/codex-project.toml.j2') }}"
+  become: true
+
+# Login shells can reset an inherited PATH before the command runs. This also
+# supplies the right PATH to newly captured shell snapshots; BASH_ENV covers -c.
+- name: Configure project selection in login shells
+  ansible.builtin.copy:
+    dest: /etc/profile.d/proteus-project.sh
+    mode: "0644"
+    content: |
+      # Managed by Proteus. Do not activate a concrete project Node prefix.
+      if [ -r "$HOME/.local/lib/proteus/project-env.sh" ]; then
+        . "$HOME/.local/lib/proteus/project-env.sh"
+      fi
   become: true

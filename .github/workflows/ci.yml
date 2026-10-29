@@ -11,6 +11,7 @@ on:
       - "enroll"
       - "lib/**"
       - "Makefile"
+      - "VERSION"
       - "provision"
       - "provisioning/**"
       - "requirements-ci.txt"
@@ -27,6 +28,7 @@ on:
       - "enroll"
       - "lib/**"
       - "Makefile"
+      - "VERSION"
       - "provision"
       - "provisioning/**"
       - "requirements-ci.txt"
@@ -67,6 +69,18 @@ jobs:
             a0ea1ccf6b7335a900adb5f8d2b8384457965fecb1ba72f09b4e3e46d12f424a \
             "$archive" | sha256sum --check
           sudo tar --extract --gzip --file "$archive" --directory /usr/local
+
+      - name: Install pinned mise for isolated Node selection tests
+        run: |
+          mise_binary="$RUNNER_TEMP/mise-2026.9.1"
+          curl --fail --location --silent --show-error \
+            --output "$mise_binary" \
+            https://github.com/jdx/mise/releases/download/v2026.9.1/mise-v2026.9.1-linux-x64
+          printf '%s  %s\n' \
+            c98423c8470d6dc416d9f7036d0646d8ef5ae92ad9186907f8fcc84cbe7db4ea \
+            "$mise_binary" | sha256sum --check
+          chmod +x "$mise_binary"
+          echo "PROTEUS_TEST_MISE=$mise_binary" >> "$GITHUB_ENV"
 
       - name: Run static checks and enrollment tests
         run: make static test

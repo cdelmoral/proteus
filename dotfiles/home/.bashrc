@@ -15,7 +15,12 @@ if [[ -r "$github_token_file" ]]; then
 fi
 unset github_token_file
 
-eval "$("$HOME/.local/bin/mise" activate bash)"
+# Resolve at execution time, including after cd and when a version is missing.
+# PATH activation can leave another Node executable available on a missing version.
+eval "$("$HOME/.local/bin/mise" activate bash --shims)"
+# pnpm is installed once in the baseline npm prefix; its env-node entry point
+# must use the selected Node rather than require pnpm in every Node installation.
+export PATH="$HOME/.local/bin:$PATH"
 
 eval "$(fzf --bash)"
 

@@ -15,7 +15,6 @@
     - "{{ ansible_facts.user_dir }}/.config/mise"
     - "{{ ansible_facts.user_dir }}/.local/bin"
     - "{{ mise_install_dir }}"
-    - "{{ salesforce_cli_dir }}"
 
 - name: Download the pinned mise binary
   ansible.builtin.get_url:
@@ -117,71 +116,17 @@
     force: true
   loop: "{{ development_npm_packages }}"
 
-- name: Link the managed Node runtime for the Salesforce CLI launcher
-  ansible.builtin.file:
-    src: "{{ managed_node.stdout | trim }}/bin/node"
-    dest: "{{ salesforce_cli_dir }}/node"
-    state: link
-    force: true
+- name: Install standalone OpenCode
+  ansible.builtin.import_tasks: opencode.yml
 
-- name: Read the registered Claude Code marketplaces
-  ansible.builtin.command:
-    argv:
-      - "{{ ansible_facts.user_dir }}/.local/bin/claude"
-      - plugin
-      - marketplace
-      - list
-      - --json
-  register: claude_marketplaces
-  environment: "{{ managed_user_environment }}"
-  changed_when: false
+- name: Install standalone Salesforce CLI
+  ansible.builtin.import_tasks: salesforce.yml
 
-- name: Register the official Claude Code marketplace
-  ansible.builtin.command:
-    argv:
-      - "{{ ansible_facts.user_dir }}/.local/bin/claude"
-      - plugin
-      - marketplace
-      - add
-      - anthropics/claude-plugins-official
-  environment: >-
-    {{ managed_user_environment | combine({
-      "CLAUDE_CODE_PLUGIN_PREFER_HTTPS": "1"
-    }) }}
-  when: >-
-    'claude-plugins-official' not in
-    (claude_marketplaces.stdout | from_json | map(attribute='name') | list)
-  changed_when: true
+- name: Install the standalone T3 CLI
+  ansible.builtin.import_tasks: t3.yml
 
-- name: Install Matt Pocock's Claude Code skills
-  ansible.builtin.command:
-    argv:
-      - "{{ ansible_facts.user_dir }}/.local/bin/claude"
-      - plugin
-      - install
-      - mattpocock-skills@claude-plugins-official
-  environment: "{{ managed_user_environment }}"
-  changed_when: true
-
-- name: Create the Claude Code managed settings directory
-  ansible.builtin.file:
-    path: /etc/claude-code
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-  become: true
-
-# Unlike ~/.claude/settings.json, which plugin installation updates, Claude
-# Code never writes managed settings, so Provisioning can own this file.
-- name: Disable Claude Code commit and pull request attribution
-  ansible.builtin.copy:
-    dest: /etc/claude-code/managed-settings.json
-    owner: root
-    group: root
-    mode: "0644"
-    content: "{{ {'attribution': {'commit': '', 'pr': ''}} | to_nice_json }}\n"
-  become: true
+- name: Install standalone Claude Code and its public skills
+  ansible.builtin.import_tasks: claude.yml
 
 - name: Link the Ubuntu fd command under its expected name
   ansible.builtin.file:

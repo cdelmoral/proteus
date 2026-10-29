@@ -135,6 +135,14 @@ class EnrollmentTest(EnrollmentHarness):
                 self.assertIn("auth status", calls[3][-1])
                 self.assertFalse((Path(self.environment["HOME"]) / ".claude").exists())
 
+    def test_claude_enrollment_does_not_resolve_project_node(self):
+        # An absent mise (and hence any absent requested project Node) must not
+        # affect either native authentication command.
+        (self.guest / ".local/bin/mise").unlink()
+        status, output = self.run_enroll("claude")
+        self.assertEqual(status, 0, output)
+        self.assertTrue((self.guest / ".claude/login").exists())
+
     def test_claude_rejects_noninteractive_use(self):
         status, output = self.run_enroll("claude", terminal=False)
         self.assertEqual(status, 1)
@@ -167,7 +175,7 @@ class EnrollmentTest(EnrollmentHarness):
                 self.assertTrue(all(call[0] == "list" for call in self.calls()))
 
     def test_claude_rejects_unprovisioned_guest(self):
-        for command in ("claude", "mise"):
+        for command in ("claude",):
             with self.subTest(command=command):
                 path = self.guest / ".local/bin" / command
                 missing = path.with_suffix(".missing")

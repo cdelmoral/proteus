@@ -1,0 +1,88 @@
+---
+- name: Require the supported T3 CLI guest platform
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.system == 'Linux'
+      - ansible_facts.architecture == 'aarch64'
+    fail_msg: T3 CLI Provisioning supports the Linux ARM64 guest only.
+
+# Follow install.sh's stable selector and SHA256SUMS, without executing it:
+# the vendor installer shares ~/.t3/runtime with the independently owned service.
+- name: Read the latest stable T3 CLI release
+  ansible.builtin.uri:
+    url: "{{ t3_release_url }}"
+    headers:
+      Accept: application/json
+    return_content: true
+    timeout: 30
+  register: t3_release
+
+- name: Validate the stable T3 CLI release selector
+  ansible.builtin.assert:
+    that: (t3_release.content | from_json).tag_name is match('^v[0-9]+\.[0-9]+\.[0-9]+$')
+    fail_msg: The vendor did not return a supported stable T3 CLI release.
+
+- name: Select the T3 CLI archive
+  ansible.builtin.set_fact:
+    t3_version: "{{ (t3_release.content | from_json).tag_name[1:] }}"
+    t3_archive: "t3-{{ (t3_release.content | from_json).tag_name[1:] }}-linux-arm64.tar.gz"
+
+- name: Create standalone T3 CLI directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ t3_install_dir }}/{{ t3_version }}"
+    - "{{ ansible_facts.user_dir }}/.cache/proteus"
+    - "{{ ansible_facts.user_dir }}/.local/bin"
+
+- name: Download and verify the official Linux ARM64 T3 CLI archive
+  ansible.builtin.get_url:
+    url: "{{ t3_distribution_url }}/v{{ t3_version }}/{{ t3_archive }}"
+    dest: "{{ ansible_facts.user_dir }}/.cache/proteus/{{ t3_archive }}"
+    checksum: "sha256:{{ t3_distribution_url }}/v{{ t3_version }}/SHA256SUMS"
+    mode: "0644"
+    timeout: 60
+
+# Keep the complete archive (native modules and assets beside the executable).
+# Never extract into, prune, or otherwise modify the service's runtime tree.
+- name: Extract the standalone T3 CLI
+  ansible.builtin.unarchive:
+    src: "{{ ansible_facts.user_dir }}/.cache/proteus/{{ t3_archive }}"
+    dest: "{{ t3_install_dir }}/{{ t3_version }}"
+    remote_src: true
+    extra_opts: [--strip-components=1]
+    creates: "{{ t3_install_dir }}/{{ t3_version }}/.install-complete"
+
+- name: Verify the standalone T3 CLI before activation
+  ansible.builtin.command:
+    argv:
+      - timeout
+      - --kill-after=5
+      - '30'
+      - "{{ t3_install_dir }}/{{ t3_version }}/t3"
+      - --version
+  environment: "{{ managed_user_environment }}"
+  changed_when: false
+
+- name: Mark the verified T3 CLI archive complete
+  ansible.builtin.copy:
+    dest: "{{ t3_install_dir }}/{{ t3_version }}/.install-complete"
+    content: "{{ t3_version }}\n"
+    mode: "0644"
+
+- name: Expose the standalone T3 CLI for interactive use
+  ansible.builtin.file:
+    src: "{{ t3_install_dir }}/{{ t3_version }}/t3"
+    dest: "{{ ansible_facts.user_dir }}/.local/bin/t3"
+    state: link
+    force: true
+
+- name: Expose the same T3 CLI for background processes
+  ansible.builtin.file:
+    src: "{{ ansible_facts.user_dir }}/.local/bin/t3"
+    dest: /usr/local/bin/t3
+    state: link
+    force: true
+  become: true

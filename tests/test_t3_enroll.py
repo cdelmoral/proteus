@@ -17,6 +17,7 @@ HELPER = ROOT / "dotfiles/home/.local/bin/proteus-enroll-t3"
 class T3EnrollmentTest(EnrollmentHarness):
     def setUp(self):
         super().setUp()
+        self.environment["T3CODE_HOME"] = str(self.guest / ".t3")
         self.environment["TEST_SERVER_PID"] = str(os.getpid())
         self.state = self.guest / ".t3/test-state.json"
         self.tool_log = self.directory / "t3-calls.jsonl"
@@ -61,6 +62,8 @@ state['linger'] = not bool(os.environ.get('TEST_LINGER_UNCHANGED'))
 save()
 """)
         self.write_command(self.guest / ".local/bin/t3", common + """
+if os.environ.get('TEST_EXPECTED_PATH'):
+    assert os.environ['PATH'] == os.environ['TEST_EXPECTED_PATH']
 assert args[-2:] == ['--base-dir', str(home / '.t3')]
 args = args[:-2]
 if args == ['connect', 'status', '--json']:
@@ -192,8 +195,15 @@ runtime.write_text(json.dumps({
                 self.assertNotIn("Enrolled T3", output)
                 self.assertEqual(self.tools(), [])
 
+    def test_enrollment_without_mise_preserves_project_path(self):
+        (self.guest / ".local/bin/mise").unlink()
+        (self.guest / ".node-version").write_text("99.99.99")
+        self.environment["TEST_EXPECTED_PATH"] = self.environment["PATH"]
+        status, output = self.run_enroll("t3")
+        self.assertEqual(status, 0, output)
+
     def test_t3_rejects_unprovisioned_guest(self):
-        for command in ("t3", "mise", "proteus-enroll-t3"):
+        for command in ("t3", "proteus-enroll-t3"):
             with self.subTest(command=command):
                 path = self.guest / ".local/bin" / command
                 missing = path.with_suffix(".missing")

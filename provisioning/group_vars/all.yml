@@ -48,16 +48,16 @@ development_tool_packages:
 development_npm_packages:
   - package: pnpm
     command: pnpm
-  - package: "@anthropic-ai/claude-code"
-    command: claude
-  - package: opencode-ai
-    command: opencode
-  - package: t3
-    command: t3
-  # The Managed Dotfiles sf launcher runs this link with fixed settings.
-  - package: "@salesforce/cli"
-    command: sf
-    link: "{{ salesforce_cli_dir }}/sf"
+
+t3_release_url: https://github.com/pingdotgg/t3code/releases/latest
+t3_distribution_url: https://github.com/pingdotgg/t3code/releases/download
+t3_install_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/t3"
+
+claude_distribution_url: https://downloads.claude.ai/claude-code-releases
+claude_install_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/claude"
+
+salesforce_manifest_url: >-
+  https://developer.salesforce.com/media/salesforce-cli/sf/channels/stable/sf-linux-arm64-buildmanifest
 
 salesforce_cli_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/salesforce-cli"
 
@@ -108,3 +108,10 @@ aws_helper_download_url: >-
   https://rolesanywhere.amazonaws.com/releases/{{ aws_helper_version }}/Aarch64/Linux/Amzn2023/aws_signing_helper
 aws_helper_checksum: "sha256:3d131aa888cd56da446f9c6bb460b1f0569f6c7edc74eae6193a2fe3928883ba"
 aws_helper_install_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/aws-helper/{{ aws_helper_version }}"
+
+# Explicit Provisioning owns OpenCode updates; use the official glibc ARM64 archive.
+opencode_release_url: https://api.github.com/repos/anomalyco/opencode/releases/latest
+opencode_install_dir: "{{ ansible_facts.user_dir }}/.local/share/proteus/opencode"
+
+# Source of the Managed Dotfiles collection, including system policy templates.
+proteus_dotfiles_source: "{{ playbook_dir }}/../dotfiles"

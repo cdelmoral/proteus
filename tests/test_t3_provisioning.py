@@ -1,0 +1,136 @@
+"""Run T3's actual Ansible tasks against an isolated vendor boundary."""
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import tarfile
+import unittest
+
+from test_enroll import ROOT
+from provisioning_fixture import (QuietHandler, prepare_playbook, provision,
+                                  serve_vendor, temporary_guest)
+
+
+@unittest.skipUnless(shutil.which('ansible-playbook'), 'Ansible is required')
+class T3ProvisioningTest(unittest.TestCase):
+    def setUp(self):
+        temporary_guest(self)
+        self.state = {
+            '.t3/userdata/secrets/credential': 'preserve-credential',
+            '.t3/userdata/server-runtime.json': '{"pid": 1234, "serviceManaged": true}',
+            '.t3/runtime/service-state.json': '{"activeVersion": "0.0.45"}',
+            '.t3/runtime/versions/0.0.45/t3': 'preserve-service-runtime',
+            '.config/systemd/user/t3code.service': 'preserve-unit',
+            '.t3/config.json': 'preserve-configuration',
+        }
+        for path, content in self.state.items():
+            destination = self.home / path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(content)
+        self.vendor = self.directory / 'vendor'
+        self.publish('1.2.3')
+        serve_vendor(self, QuietHandler)
+        prepare_playbook(self, 't3', [('/usr/local', str(self.system)),
+                                      ('become: true', 'become: false')])
+        self.variables = {
+            'ansible_facts': {'system': 'Linux', 'architecture': 'aarch64',
+                              'user_dir': str(self.home), 'env': {'PATH': '/usr/bin:/bin'}},
+            'ansible_python_interpreter': os.sys.executable,
+            't3_distribution_url': f'http://127.0.0.1:{self.server.server_port}',
+            't3_release_url': f'http://127.0.0.1:{self.server.server_port}/latest',
+        }
+
+    def publish(self, version, bad_digest=False, invalid_executable=False):
+        release = self.vendor / ('v' + version)
+        release.mkdir(parents=True)
+        stage = self.directory / ('stage-' + version)
+        stage.mkdir()
+        binary = stage / 't3'
+        # Exercise real archive/checksum/install boundaries; this executable is
+        # simulated and cannot prove Linux ARM64 vendor compatibility.
+        binary.write_text(f'''#!{os.sys.executable}
+import os, pathlib, subprocess, sys
+assert pathlib.Path(__file__).resolve().with_name('asset').read_text() == 'required-asset'
+if sys.argv[1:] == ['--version']:
+    if {invalid_executable!r}:
+        sys.exit(92)
+    print('{version}')
+elif sys.argv[1:] == ['fixture-child']:
+    sys.exit(subprocess.call(['node', '--version']))
+else:
+    sys.exit(91)  # No connect, service, update, or enrollment during Provisioning.
+''')
+        binary.chmod(0o755)
+        (stage / 'asset').write_text('required-asset')
+        archive = release / f't3-{version}-linux-arm64.tar.gz'
+        with tarfile.open(archive, 'w:gz') as bundle:
+            bundle.add(stage, arcname=f't3-{version}-linux-arm64')
+        (self.vendor / 'latest').write_text(json.dumps({'tag_name': 'v' + version}))
+        digest = '0' * 64 if bad_digest else hashlib.sha256(archive.read_bytes()).hexdigest()
+        (release / 'SHA256SUMS').write_text(f'{digest}  {archive.name}\n')
+
+    def provision(self, **variables):
+        return provision(self, **variables)
+
+    def assert_state(self):
+        for path, content in self.state.items():
+            self.assertEqual((self.home / path).read_text(), content)
+
+    def run_t3(self, *args, path=None, cwd=None):
+        return subprocess.run(['t3', *args], env={'HOME': str(self.home),
+                              'PATH': path or str(self.system / 'bin')}, cwd=cwd,
+                              capture_output=True, text=True, timeout=15)
+
+    def test_install_repeat_upgrade_and_preserve_user_state(self):
+        for version in ('1.2.3', '1.2.3', '1.2.4'):
+            if version == '1.2.4':
+                self.publish(version)
+            result = self.provision()
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            result = self.run_t3('--version')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(version, result.stdout)
+            self.assert_state()
+        for selection in ('v20', 'v22', 'missing'):
+            project = self.directory / selection
+            project.mkdir()
+            (project / '.node-version').write_text(selection)
+            project_bin = project / 'bin'
+            project_bin.mkdir()
+            node = project_bin / 'node'
+            node.write_text('#!/bin/sh\n' + ('exit 42\n' if selection == 'missing' else f'echo {selection}\n'))
+            node.chmod(0o755)
+            path = f'{self.system / "bin"}:{project_bin}'
+            self.assertEqual(self.run_t3('--version', path=path, cwd=project).returncode, 0)
+            child = self.run_t3('fixture-child', path=path, cwd=project)
+            self.assertEqual(child.returncode, 42 if selection == 'missing' else 0)
+            if selection != 'missing':
+                self.assertEqual(child.stdout.strip(), selection)
+
+    def test_invalid_artifact_preserves_active_command_and_state(self):
+        result = self.provision()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.publish('1.2.4', bad_digest=True)
+        result = self.provision()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('1.2.3', self.run_t3('--version').stdout)
+        self.assert_state()
+        (self.vendor / 'latest').write_text(json.dumps({'tag_name': '../unsafe'}))
+        self.assertNotEqual(self.provision().returncode, 0)
+        self.assertIn('1.2.3', self.run_t3('--version').stdout)
+        self.assert_state()
+
+    def test_unusable_executable_preserves_active_command_and_state(self):
+        self.assertEqual(self.provision().returncode, 0)
+        self.publish('1.2.4', invalid_executable=True)
+        self.assertNotEqual(self.provision().returncode, 0)
+        self.assertIn('1.2.3', self.run_t3('--version').stdout)
+        self.assert_state()
+
+    def test_unsupported_architecture_fails_without_installing(self):
+        facts = {**self.variables['ansible_facts'], 'architecture': 'x86_64'}
+        result = self.provision(ansible_facts=facts)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.system / 'bin/t3').exists())
+        self.assert_state()

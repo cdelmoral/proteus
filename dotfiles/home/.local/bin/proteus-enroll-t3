@@ -33,10 +33,7 @@ class Enrollment:
         self.home = Path.home()
         self.base = Path(os.environ.get("T3CODE_HOME", self.home / ".t3")).expanduser().resolve()
         self.state = self.base / "userdata"
-        self.cli = [
-            str(self.home / ".local/bin/mise"), "exec", "--",
-            str(self.home / ".local/bin/t3"),
-        ]
+        self.cli = [str(self.home / ".local/bin/t3")]
 
     def t3(self, *arguments, interactive=False):
         command = [*self.cli, *arguments, "--base-dir", str(self.base)]

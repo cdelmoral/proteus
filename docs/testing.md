@@ -8,11 +8,41 @@ Run `make static test` to validate Provisioning and the VM Definition and exerci
 
 Teamwork Graph tests run the real enrollment helper and simulate TWG and lingering commands. They cover guest-local authorization, preserving healthy credentials, minimal native verification, upkeep failures and retries, custom instances, and terminal/VM prerequisites. Unexpected product probes or service-health commands fail the simulated CLI.
 
-Salesforce tests run the real launcher, enrollment helper, and URL-capture script in the guest home and simulate only the npm-installed Salesforce CLI, which opens its authorization URL through `BROWSER` as Salesforce CLI does. They cover login, browser-launch, and verification failures, repeat enrollment, and VM and terminal checks. Configuration tests drive `./configure` to save, keep, and reject Salesforce login URLs while preserving the GitHub references, and confirm the saved URL or the standard default reaches Salesforce CLI. Salesforce CLI tests run the managed `sf` launcher from the system PATH without shell startup and simulate only the npm-installed CLI, verifying its keychain and telemetry settings.
+Salesforce tests run the real launcher, enrollment helper, and URL-capture script in the guest home and simulate only the standalone Salesforce CLI, which opens its authorization URL through `BROWSER` as Salesforce CLI does. They cover login, browser-launch, and verification failures, repeat enrollment, and VM and terminal checks. Configuration tests drive `./configure` to save, keep, and reject Salesforce login URLs while preserving the GitHub references, and confirm the saved URL or the standard default reaches Salesforce CLI. Salesforce CLI tests run the managed `sf` launcher from the system PATH without shell startup and simulate only the archive runtime and CLI, verifying keychain, telemetry and updater settings, argument forwarding, failure propagation, and unchanged child PATH across installed and missing project runtimes. Salesforce Provisioning tests run real Ansible tasks against a local manifest and archive, including digest/runtime failures, repeat runs, upgrades, and preservation of dummy user state.
 
-T3 tests simulate systemd, lingering, and provider-independent Connect setup, including partial failures, retries, and existing-server protection. They verify completion from saved Connect configuration and systemd persistence, including links saved after startup and healthy services without private runtime metadata.
+T3 tests simulate systemd, lingering, and provider-independent Connect setup, including partial failures, retries, and existing-server protection. They verify completion from saved Connect configuration and systemd persistence, including links saved after startup and healthy services without private runtime metadata. Focused Provisioning tests execute the real Ansible tasks with local release archives/checksums. They cover upgrades, invalid artifacts/selectors, preserved service files and credentials, direct enrollment without mise, and inherited project child PATH.
 
 GitHub credential tests require Git, GitHub CLI, and OpenSSH. They exercise real credential lookup with dummy tokens and real signing with temporary keys, without network access. They cover background Git and `gh` commands, commit signing without a terminal or SSH agent, identity preservation, reprovisioning, credential rotation, invalid or encrypted keys, rejected tokens, missing references, and failed secret reads. Configure tests cover reference examples, preserving both defaults, upgrading token-only configuration, and interrupted input.
+
+The focused Node tests execute pinned mise against temporary homes and isolated fixture executables, without downloading Node or touching the user's mise configuration. Run them with `PROTEUS_TEST_MISE=/absolute/path/to/mise-2026.9.1 python3 -m unittest discover -s tests -p test_node_selection.py`. Without this variable they skip; these fixtures verify mise selection and missing-version behavior, while real Node/pnpm integration belongs to Lima acceptance.
+
+OpenCode tests execute the real Ansible installation tasks against a local HTTP
+release feed and fixture archives. They verify digest and platform rejection,
+failed candidates preserving the old installation, repeat runs and
+updates, unrelated command preservation, and untouched user state. A real launcher
+test verifies argument forwarding, failure propagation, the auto-update flag, and
+child command resolution through an unchanged project PATH. The vendor executable
+is simulated in these focused tests. They do not prove vendor ARM64 compatibility
+or real T3 execution. The Lima checks below exercise the real vendor distribution;
+a provider-authenticated OpenCode task spawning a project command through T3 is
+still part of spec #50's Node-selection acceptance.
+
+OpenCode #54 implementation validation ran on Linux. Real macOS/Lima acceptance
+remains **unrun**; do not interpret local fixture results as guest evidence.
+
+Release guard tests drive the real `./provision` entrypoint and the production
+Ansible guard with a local transport and a simulated Python/bootstrap boundary.
+They cover fresh/repeated releases, numeric compatible upgrades, incompatible
+majors, old unversioned guests, all downgrades, corrupt versions, interrupted
+retries and failed upgrades retaining the accepted marker. Rejections leave seeded
+guest data unchanged and never reach the mutation boundary. No real VM is used.
+
+Local release-policy validation (2026-10-27, Linux ARM64): `make static` passed
+and `make test` passed all 156 tests with zero skips. Runs unset `T3CODE_HOME` and
+use a controlled tool/system PATH; the full suite includes Node 24.20.0 and
+`PROTEUS_TEST_MISE` pointing to pinned mise 2026.9.1. Static and suite timeouts
+were 180 and 600 seconds. These checks use isolated fixtures; no real guest,
+Credential Enrollment, or service restart was performed.
 
 ## Manual acceptance
 
@@ -22,7 +52,79 @@ Run the real macOS-to-Lima acceptance check manually:
 make lima-acceptance
 ```
 
-The check validates the production VM Definition, creates and starts a uniquely named `proteus-acceptance-*` VM, and invokes the production Provisioning command once. Fresh-VM Provisioning's exit status is the behavioral assertion. Setup or cleanup failures also fail the command. The check does not run Provisioning a second time or test exact convergence.
+The check validates the production VM Definition, creates and starts a uniquely named `proteus-acceptance-*` VM, and runs production Provisioning twice, checking the accepted release marker against `VERSION` after each pass. Claude assertions are isolated in `tests/claude_guest_acceptance.py`: the fresh run checks actual ARM64 artifact compatibility, interactive and system-PATH command availability, public marketplace/skills installation, managed attribution/update policy, and unauthenticated status with project Node blocked. It then seeds dummy credential, configuration, and history state.
+
+Node assertions in `tests/lima_node_selection.py` use temporary repositories to exercise `.nvmrc`, `.node-version`, and `mise.toml`, interactive directory switching and default selection, explicit installation, missing-version failures without download, and pnpm build/test scripts with observed runtimes and failure propagation. They deliberately change the global default before the second Provisioning run.
+
+The Node runner also launches real transient systemd user services with an empty
+environment plus HOME and a minimal system PATH, without shell initialization.
+It checks node/npm across all declarations, concurrently running projects on
+different versions, missing node/npm/pnpm failure, OpenCode availability before
+recovery, and explicit `mise install node` from that background environment.
+A real baseline Node parent launches project pnpm build/test and npm commands
+through `proteus-project-exec` with a deliberately inherited baseline-first PATH;
+the parent retains its version while children use project Node. Argument and
+failure propagation are checked. Both Provisioning passes exercise these paths.
+The disposable guest must have a functioning systemd user manager; failure to
+launch a transient service fails acceptance rather than substituting a fixture.
+This requires no T3 enrollment and does not touch an existing T3 service.
+
+Claude, Salesforce, OpenCode, and T3 dummy state is seeded before Node assertions change the global default. The compatible repeated run must preserve each tool's user state, restore the pinned Node default, and retain usable additional project versions. No real Credential Enrollment is performed. Setup, assertions, Provisioning, and cleanup failures fail the command. This checks observable behavior rather than exact convergence of all Provisioning tasks.
+
+Focused Claude tests execute the actual Ansible tasks with a local HTTP vendor fixture. They exercise upgrades, checksum/selector failures, user-state preservation, and child environment preservation. Enrollment subprocess tests confirm that login/status no longer require mise. These fixtures do not prove Linux ARM64 vendor compatibility or real authentication.
+
+Claude guest acceptance evidence: **unrun** on the Linux implementation host. Run `make lima-acceptance` on macOS and record the date, guest architecture, Claude version, and fresh/repeated outcomes before claiming guest acceptance. Real `./enroll claude` and subsequent authenticated status also remain manual, unrun checks requiring the owner's authorization; they are not part of the automated acceptance flow. Node guest acceptance is also **unrun** on this host.
+
+For #52, real authenticated T3 acceptance remains **unrun**. In the existing
+enrolled service, record the service PID/runtime and agent PATH before and after
+Provisioning without restarting it. From an agent run the two project versions
+concurrently, pnpm build/test, a missing-version failure followed by explicit
+installation, and a tool-parent/project-child command. Use the absolute
+`proteus-project-exec` entrypoint if the service has a private runtime first on
+PATH, as described in [Node operations](./node-versions.md). Record whether direct
+commands or the explicit entrypoint were used, actual versions, exit statuses,
+and unchanged service PID/runtime. Transient systemd services prove guest
+background behavior when run; they do not prove T3's provider subprocess
+environment. Local mise tests use fixture Node executables and prove neither.
+
+After the shared second Provisioning run, `tests/lima_opencode.sh` verifies the
+installed vendor binary is ARM64 ELF, user configuration/credentials/skills/state
+survive byte for byte, and
+interactive and minimal background environments find the same OpenCode launcher.
+OpenCode must launch from a temporary project requesting an uninstalled Node
+version without installing it; a failing Node executable on the background PATH
+detects accidental runtime coupling.
+
+T3 assertions in `tests/t3_guest_acceptance.py` check the real archive's ARM64
+executable, interactive/system-PATH invocation with blocked project Node, and
+unauthenticated Connect status. Explicit test setup then installs a real local
+systemd service bound to loopback, seeds dummy state,
+and records process identity, runtime hashes, service unit, and configuration.
+Repeat production Provisioning must preserve those records.
+This service is **not Connect-enrolled**; automated acceptance never authorizes
+Connect or uses real credentials. Subprocesses and service readiness waits are
+bounded.
+
+T3 Linux ARM64 host artifact check (2026-10-27): **passed** using the actual
+Ansible task file against official `v0.1.3` release endpoints, an isolated home,
+and redirected command links. Checksum verification, full extraction, ELF ARM64
+identification, `--version`, and preservation of seeded service/state files passed.
+The first attempts in RAM-backed `/tmp` timed out under severe memory pressure;
+using disk-backed temporary storage resolved that resource constraint. This did
+not install a real service or perform Connect enrollment.
+
+T3 guest acceptance evidence: **unrun** on the Linux implementation host.
+Run `make lima-acceptance` on macOS and record date, guest architecture, CLI and
+service versions, and fresh/repeated outcomes. Separately, on an owner-authorized
+Connect-enrolled guest, record `systemctl --user show t3code.service` process
+identity/start time, active/enabled state, service runtime selection and hashes,
+and hashes of credentials/configuration before and after `./provision`. Confirm
+these remain unchanged and an existing remote connection continues working,
+including when the service version differs from the CLI. Do not print credential
+contents in the evidence. That enrolled-service case, real Connect onboarding and
+retry, logout/reboot persistence, and background agent project Node resolution
+remain **unrun** here; fixtures and the unauthenticated local service do not prove
+them. See the #52 acceptance procedure above for the integrated Node-resolution checks.
 
 The check refuses to adopt an existing instance and deletes the VM it created after success or failure. It disables development-port forwarding for that VM, so the normal `proteus` instance may remain running.
 
@@ -34,7 +136,15 @@ For Teamwork Graph, run `./enroll twg`, authorize your personal account through 
 
 For T3, run `./enroll t3` on a fresh provisioned VM from an interactive macOS terminal. Accept relay-client and service installation, approve the browser code, and confirm local verification completes. Sign in to the same T3 Connect account from another device and connect to the environment. Close the guest shell, then stop/start the VM; confirm the service and remote access return without running enrollment again. Authenticate a provider separately to run agent work.
 
-Repeat T3 enrollment and confirm it leaves the running service untouched. Verify that a service on a different version from the npm CLI still passes when healthy. Decline or interrupt setup, confirm incomplete setup is reported, and retry using the saved authorization. Start a foreground server and confirm enrollment refuses takeover. For a running service started before Connect was enabled, confirm enrollment saves authorization and environment linking without restarting it or rejecting the new link's timestamp. Verify remote access from another device; if activation needs a restart, perform it explicitly when ready. After deleting the VM, deregister its old cloud environment and enroll the replacement afresh.
+Repeat T3 enrollment and confirm it leaves the running service untouched. Verify that a service on a different version from the standalone CLI still passes when healthy. Decline or interrupt setup, confirm incomplete setup is reported, and retry using the saved authorization. Start a foreground server and confirm enrollment refuses takeover. For a running service started before Connect was enabled, confirm enrollment saves authorization and environment linking without restarting it or rejecting the new link's timestamp. Verify remote access from another device; if activation needs a restart, perform it explicitly when ready. After deleting the VM, deregister its old cloud environment and enroll the replacement afresh.
+
+The existing `make lima-acceptance` flow also verifies Salesforce's real Linux
+ARM64 archive, system PATH and user-systemd background availability, launches with
+two installed Node runtimes and an absent project runtime, interactive execution,
+CLI failures and repeat compatible Provisioning. It installs the
+additional Node explicitly and seeds only dummy Salesforce state; it never logs
+in. Fixture tests do not establish real guest or macOS/Lima compatibility. The
+manual Salesforce Credential Enrollment checks below still require a human.
 
 For Salesforce, run `./configure` with your org's login URL, then run `./enroll salesforce` on a fresh provisioned VM from an interactive macOS terminal. Open the printed URL in the macOS browser, log in as the Dev Hub User, approve access, and confirm enrollment reports success. Inside the guest, create a scratch org, run a command against it, and open it with `sf org open --url-only`. Run `sf org list` through T3's background service. Stop and start the VM and confirm the authorization persists, then re-enroll. After a rebuild, follow the scratch org deletion and OAuth revocation steps for the old VM and enroll the replacement.
 
@@ -89,4 +199,4 @@ Use the [setup, replacement and rebuild guide](./aws-setup.md) and
 [AWS Credential Enrollment guide](./aws-enrollment.md) as the operating steps.
 Record actual outcomes and dates here when acceptance is performed; do not mark
 these rows passed from automated fixtures. `make lima-acceptance` checks baseline
-Provisioning only and does not run this AWS matrix.
+Provisioning and project Node selection; it does not run this AWS matrix.

@@ -1,0 +1,79 @@
+---
+- name: Require the supported Salesforce CLI guest platform
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.system == 'Linux'
+      - ansible_facts.architecture == 'aarch64'
+    fail_msg: Salesforce CLI Provisioning supports the Linux ARM64 guest only.
+
+# Salesforce's CDN rejects Ansible's default user agent with HTTP 403.
+# Use the user agent accepted by the vendor's curl download examples.
+- name: Read the current stable Salesforce CLI manifest
+  ansible.builtin.uri:
+    url: "{{ salesforce_manifest_url }}"
+    http_agent: curl
+    return_content: true
+  register: salesforce_manifest
+
+- name: Select the standalone Salesforce CLI release
+  ansible.builtin.set_fact:
+    salesforce_release: "{{ salesforce_manifest.content | from_json }}"
+
+- name: Validate the Salesforce CLI release manifest
+  ansible.builtin.assert:
+    that:
+      - salesforce_release.version is match('^[0-9]+\.[0-9]+\.[0-9]+$')
+      - salesforce_release.sha is match('^[a-f0-9]+$')
+      - salesforce_release.sha256xz is match('^[a-f0-9]{64}$')
+      - salesforce_release.baseDir == 'sf'
+    fail_msg: The vendor did not return a supported Salesforce CLI release manifest.
+
+- name: Select the Salesforce CLI release directory
+  ansible.builtin.set_fact:
+    salesforce_release_dir: "{{ salesforce_cli_dir }}/{{ salesforce_release.version }}-{{ salesforce_release.sha }}"
+
+- name: Create standalone Salesforce CLI directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ salesforce_release_dir }}"
+    - "{{ ansible_facts.user_dir }}/.cache/proteus"
+
+- name: Download and verify the official Linux ARM64 Salesforce CLI archive
+  ansible.builtin.get_url:
+    url: "{{ salesforce_release.xz }}"
+    http_agent: curl
+    dest: "{{ ansible_facts.user_dir }}/.cache/proteus/salesforce-cli.tar.xz"
+    checksum: "sha256:{{ salesforce_release.sha256xz }}"
+    mode: "0644"
+
+- name: Extract the standalone Salesforce CLI release
+  ansible.builtin.unarchive:
+    src: "{{ ansible_facts.user_dir }}/.cache/proteus/salesforce-cli.tar.xz"
+    dest: "{{ salesforce_release_dir }}"
+    remote_src: true
+
+- name: Verify Salesforce CLI with its bundled runtime before activation
+  ansible.builtin.command:
+    argv:
+      - "{{ salesforce_release_dir }}/sf/bin/node"
+      - --no-deprecation
+      - "{{ salesforce_release_dir }}/sf/bin/run.js"
+      - --version
+  environment: >-
+    {{ managed_user_environment | combine({
+      "SF_USE_GENERIC_UNIX_KEYCHAIN": "true",
+      "SF_DISABLE_TELEMETRY": "true",
+      "SF_AUTOUPDATE_DISABLE": "true",
+      "SF_DISABLE_AUTOUPDATE": "true"
+    }) }}
+  changed_when: false
+
+- name: Activate the standalone Salesforce CLI release
+  ansible.builtin.file:
+    src: "{{ salesforce_release_dir }}/sf"
+    dest: "{{ salesforce_cli_dir }}/current"
+    state: link
+    force: true

@@ -1,0 +1,8 @@
+# Project declarations are resolved by mise; Provisioning owns tools.node in
+# config.toml separately so restoring the default preserves other user settings.
+[settings]
+idiomatic_version_file_enable_tools = ["node"]
+idiomatic_version_file_disable_files = ["node:package.json"]
+auto_install = false
+not_found_auto_install = false
+not_found_system_fallback = false
