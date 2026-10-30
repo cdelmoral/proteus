@@ -89,6 +89,7 @@
     mode: "0644"
     content: >-
       {{ {'attribution': {'commit': '', 'pr': ''}, 'env': {'DISABLE_AUTOUPDATER': '1',
+      'CLAUDE_CODE_ARTIFACT': '1',
       'CLAUDE_ENV_FILE': ansible_facts.user_dir ~ '/.local/lib/proteus/project-env.sh'}} | to_nice_json }}
   become: true
 

@@ -102,6 +102,7 @@ else:
         policy = json.loads((self.system / 'settings/managed-settings.json').read_text())
         self.assertEqual(policy['attribution'], {'commit': '', 'pr': ''})
         self.assertEqual(policy['env']['DISABLE_AUTOUPDATER'], '1')
+        self.assertEqual(policy['env']['CLAUDE_CODE_ARTIFACT'], '1')
         self.assertEqual(policy['env']['CLAUDE_ENV_FILE'],
                          str(self.home / '.local/lib/proteus/project-env.sh'))
         for selection in ('v20', 'v22', 'missing'):

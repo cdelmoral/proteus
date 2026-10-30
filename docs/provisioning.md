@@ -125,7 +125,7 @@ the manifest's detached GPG signature.
 
 Provisioning also registers the official Claude Code plugin marketplace and runs `claude plugin install mattpocock-skills@claude-plugins-official` as the guest user. The skills are installed at user scope for all projects. Installing this public plugin does not require Claude Code sign-in; run `./enroll claude` when you start using Claude Code.
 
-Provisioning installs `/etc/claude-code/managed-settings.json`, which disables independent background updates, Claude Code's commit `Co-Authored-By` trailer and pull request footer. Managed settings take precedence over user and project settings, so attribution cannot be re-enabled per project; edit the Provisioning task to change it.
+Provisioning installs `/etc/claude-code/managed-settings.json`, which disables independent background updates, Claude Code's commit `Co-Authored-By` trailer and pull request footer. It also sets `env.CLAUDE_CODE_ARTIFACT=1` so agents in the guest, including those launched by T3, can create Claude artifacts. Managed settings take precedence over user and project settings, so attribution cannot be re-enabled per project; edit the Provisioning task to change it.
 
 A rebuild does not restore VM-Local Credentials, Host-Injected Credentials, project repositories, uncommitted work, command history, caches, application state, or workspace state. Back up or publish work that must survive before deleting Proteus. Credential Enrollment and repository cloning happen again in the new guest.
 

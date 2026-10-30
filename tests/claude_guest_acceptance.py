@@ -59,6 +59,7 @@ else:
     policy = json.loads(Path('/etc/claude-code/managed-settings.json').read_text())
     assert policy['attribution'] == {'commit': '', 'pr': ''}
     assert policy['env']['DISABLE_AUTOUPDATER'] == '1'
+    assert policy['env']['CLAUDE_CODE_ARTIFACT'] == '1'
     # Tool launches must not resolve Node, with both installed-looking and
     # missing project declarations. Full mise selection is a separate ticket.
     with tempfile.TemporaryDirectory(prefix='proteus-claude-') as temporary:
