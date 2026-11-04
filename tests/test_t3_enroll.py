@@ -12,6 +12,11 @@ from test_enroll import EnrollmentHarness, ROOT
 
 
 HELPER = ROOT / "dotfiles/home/.local/bin/proteus-enroll-t3"
+STARTUP = "T3 Code server is ready.\nToken: sensitive-pairing-token\n"
+TUNNEL_REJECTION = (
+    "WARN: Failed to reconcile T3 Connect desired link on startup\n"
+    "  description: 'T3 Connect: Relay managed tunnel limit reached: this account allows at most 3 tunnels.'\n"
+)
 
 
 class T3EnrollmentTest(EnrollmentHarness):
@@ -87,6 +92,11 @@ if os.environ.get('TEST_RELAY_DECLINED'):
     sys.exit(0)
 state['relay'] = 'available'
 save()
+if os.environ.get('TEST_SERVICE_LOG'):
+    logs = home / '.t3/userdata/logs'
+    logs.mkdir(parents=True, exist_ok=True)
+    with open(logs / 'boot-service.log', 'a') as service_log:
+        service_log.write(os.environ['TEST_SERVICE_LOG'])
 if os.environ.get('TEST_T3_LOGIN_FAIL'):
     sys.exit(1)
 state['authenticated'] = state['desired'] = True
@@ -362,6 +372,22 @@ runtime.write_text(json.dumps({
         self.assertEqual(status, 1, output)
         self.assertIn("environment linking is incomplete", output)
         self.assertNotIn("Enrolled T3", output)
+
+    def test_tunnel_limit_rejection_is_explained(self):
+        for failure in ({}, {"TEST_T3_LOGIN_FAIL": "1"}):
+            with self.subTest(failure=failure):
+                shutil.rmtree(self.guest / ".t3", ignore_errors=True)
+                shutil.rmtree(self.guest / ".config", ignore_errors=True)
+                status, output = self.run_enroll("t3", TEST_SERVICE_LOG=STARTUP + TUNNEL_REJECTION, **failure)
+                self.assertEqual(status, 1 if failure else 0, output)
+                self.assertIn("tunnel limit is reached", output)
+                self.assertIn("Deregister an unused environment", output)
+                self.assertNotIn("sensitive-", output)
+
+    def test_tunnel_limit_from_earlier_startup_is_ignored(self):
+        status, output = self.run_enroll("t3", TEST_SERVICE_LOG=STARTUP + TUNNEL_REJECTION + STARTUP)
+        self.assertEqual(status, 0, output)
+        self.assertNotIn("tunnel limit", output)
 
     def test_failed_linking_running_service_preserves_work(self):
         _, runtime = self.seed_enrollment(desired=False, authenticated=False, linked=False)
