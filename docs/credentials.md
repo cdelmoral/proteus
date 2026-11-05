@@ -77,6 +77,8 @@ Provisioning updates only the standalone CLI without updating or restarting an e
 
 Deleting the VM removes its local credentials and service. Before a rebuild, deregister its old environment through the account's T3 Connect page; you can also deregister an already wiped environment. Forgetting it in a device's connection list is insufficient. Enroll the replacement VM afresh; Proteus does not automate cloud deregistration.
 
+T3 Connect limits how many tunnels an account may hold, and a deleted VM's environment still counts until deregistered. When the service log's latest startup records that rejection, enrollment says so, whether it succeeds or fails, without printing the log. Deregister an unused environment from the T3 Connect page in the app's account menu, run `t3 service restart` in the guest, and retry enrollment.
+
 The helper expects the `desired`, `authenticated`, and `linked` boolean fields from T3 Connect status. It uses the guest's `T3CODE_HOME`, or `~/.t3` by default, and refuses to replace an existing service configured for another data directory. Run recovery commands with the same data directory when using a custom one.
 
 ## Teamwork Graph

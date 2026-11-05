@@ -16,6 +16,14 @@ import sys
 
 
 UNIT = "t3code.service"
+# The service log restates each startup; only the latest one describes current link state.
+READY_MARKER = "T3 Code server is ready."
+TUNNEL_LIMIT_MARKER = "tunnel limit reached"
+TUNNEL_LIMIT = (
+    "T3 Connect rejected this environment because the account's tunnel limit is reached. "
+    "Deregister an unused environment on the account's T3 Connect page, run `t3 service restart` "
+    "in the guest, then retry enrollment."
+)
 
 
 class Incomplete(Exception):
@@ -88,6 +96,17 @@ class Enrollment:
         except (ValueError, KeyError, TypeError, PermissionError):
             raise Incomplete("Could not safely identify the existing T3 server. Inspect `t3 service status` before retrying.") from None
 
+    def tunnel_limit_reached(self):
+        """Report a relay rejection from the latest service startup without printing the log."""
+        path = self.state / "logs/boot-service.log"
+        try:
+            with path.open("rb") as log:
+                log.seek(max(0, path.stat().st_size - 1_000_000))
+                text = log.read().decode(errors="replace")
+        except OSError:
+            return False
+        return TUNNEL_LIMIT_MARKER in text.rpartition(READY_MARKER)[2]
+
     def protect_server(self, service):
         server = self.running_server()
         if server and (server.get("serviceManaged") is not True or service is None):
@@ -159,16 +178,22 @@ class Enrollment:
 
 
 def main():
+    enrollment = Enrollment()
     try:
-        Enrollment().run()
+        enrollment.run()
     except (Incomplete, OSError, subprocess.TimeoutExpired, ValueError) as error:
         # Unexpected OS/subprocess details may include captured status output.
         message = str(error) if isinstance(error, Incomplete) else "Could not verify T3 setup. Inspect `t3 service status` and retry."
         print(message, file=sys.stderr)
+        if enrollment.tunnel_limit_reached():
+            print(TUNNEL_LIMIT, file=sys.stderr)
         return 1
     except KeyboardInterrupt:
         print("T3 Enrollment interrupted. Completed steps were preserved.", file=sys.stderr)
         return 1
+    # Completion checks saved state only, so a rejected link would otherwise go unmentioned.
+    if enrollment.tunnel_limit_reached():
+        print(TUNNEL_LIMIT, file=sys.stderr)
     return 0
 
 
