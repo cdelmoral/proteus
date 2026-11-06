@@ -35,7 +35,17 @@ containerd:
   system: false
   user: false
 
+# Lima applies the first matching rule and forwards every other guest port by
+# default, so the ignore rules must stay ahead of any other rule.
 portForwards:
+  # SST's dev RPC server. It always tries 13557 first, and a forward would
+  # capture the Mac's own SST calls to 127.0.0.1:13557, sending host deploys
+  # to the guest's SST.
+  - guestPort: 13557
+    ignore: true
+  # SST's HTTPS proxy on the RPC port + 1000, started when SST has local certs.
+  - guestPort: 14557
+    ignore: true
   - guestPort: 3000
     hostPort: 3000
     hostIP: "127.0.0.1"

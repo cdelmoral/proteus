@@ -34,6 +34,13 @@ The VM Definition forwards these guest ports to localhost on the Mac:
 
 Lima also automatically forwards other TCP ports that guest processes listen on to the same port on host localhost. The explicit rules keep the ports above forwarded regardless of that default.
 
+The VM Definition never forwards these guest ports:
+
+- `13557`, SST's dev RPC server
+- `14557`, SST's HTTPS proxy on the RPC port + 1000
+
+SST always tries port 13557 first and has no setting to change it. If the guest's SST server were forwarded, an SST deploy or `sst dev` on the Mac would see the port as free, but its Pulumi calls to `127.0.0.1:13557` would reach the guest's SST, which fails on Mac paths. Nothing on the Mac needs the guest's SST server, so it stays guest-only. Lima applies the first matching rule, so these `ignore` rules must stay ahead of every other `portForwards` rule.
+
 To expose one port to selected devices on the local network, stop Proteus and change that port's `hostIP` in `vm/proteus.yaml` to `"0.0.0.0"`:
 
 ```yaml
